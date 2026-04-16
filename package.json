@@ -1,0 +1,112 @@
+{
+  "name": "live-stream-download-manager-pro",
+  "version": "1.2.0",
+  "main": "electron/main.js",
+  "scripts": {
+    "dev": "concurrently -k \"cross-env BROWSER=none vite\" \"npm run dev:electron\"",
+    "dev:electron": "wait-on tcp:5173 && electron .",
+    "prebuild": "node scripts/download-bins.js",
+    "build:base": "vite build",
+    "build:win": "npm run build:base && electron-builder --win",
+    "build:mac-x64": "npm run build:base && electron-builder --mac --x64",
+    "build:mac-arm64": "npm run build:base && electron-builder --mac --arm64",
+    "build:linux": "npm run build:base && electron-builder --linux",
+    "build:all": "npm run build:base && electron-builder -wml"
+  },
+  "build": {
+    "appId": "com.brahim.livestreammanager",
+    "productName": "Live Stream Download Manager",
+    "directories": {
+      "output": "release"
+    },
+    "asar": true,
+    "asarUnpack": [
+      "**/*/ffmpeg-static/*",
+      "**/*/ffprobe-static/*"
+    ],
+    "mac": {
+      "icon": "build/icon.png",
+      "target": "dmg",
+      "category": "public.app-category.video",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "extraResources": [
+        {
+          "from": "bin",
+          "to": "bin",
+          "filter": [
+            "yt-dlp_macos"
+          ]
+        }
+      ]
+    },
+    "win": {
+      "icon": "build/icon.png",
+      "target": "nsis",
+      "extraResources": [
+        {
+          "from": "bin",
+          "to": "bin",
+          "filter": [
+            "yt-dlp.exe"
+          ]
+        }
+      ]
+    },
+    "linux": {
+      "icon": "build/icon.png",
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Video",
+      "extraResources": [
+        {
+          "from": "bin",
+          "to": "bin",
+          "filter": [
+            "yt-dlp"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "deleteAppDataOnUninstall": true
+    }
+  },
+  "keywords": [],
+  "author": "Brahim",
+  "license": "ISC",
+  "description": "Live Stream Download Manager",
+  "dependencies": {
+    "clsx": "^2.1.1",
+    "electron-store": "^8.2.0",
+    "ffmpeg-static": "^5.3.0",
+    "ffprobe-static": "^3.1.0",
+    "lucide-react": "^1.7.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "tailwind-merge": "^3.5.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.2.2",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "autoprefixer": "^10.4.27",
+    "concurrently": "^9.2.1",
+    "cross-env": "^10.1.0",
+    "electron": "^41.1.1",
+    "electron-builder": "^26.8.1",
+    "postcss": "^8.5.8",
+    "tailwindcss": "^4.2.2",
+    "typescript": "^6.0.2",
+    "vite": "^8.0.3",
+    "wait-on": "^9.0.4"
+  }
+}

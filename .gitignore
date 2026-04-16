@@ -1,0 +1,13 @@
+node_modules/
+dist/
+release/
+bin/
+*.exe
+*.log
+.DS_Store
+.env
+Licence_Key.txt
+test-dump.json
+build.log
+build_log.txt
+scratch/
