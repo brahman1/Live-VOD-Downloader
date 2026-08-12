@@ -19,19 +19,31 @@ function downloadFile(url, dest) {
     console.log(`Downloading ${path.basename(dest)}...`);
     const userAgent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36';
     
-    // Method 1: Try curl (built into macOS, Linux, and Windows 10/11) with retries
+    // Method 1: Try curl with HTTP/1.1 and IPv4 to avoid HTTP2 socket hangup bugs on macOS
     try {
-      execSync(`curl -L --retry 5 --retry-delay 2 -A "${userAgent}" -f -s -S -o "${dest}" "${url}"`, { stdio: 'inherit' });
+      execSync(`curl -4 --http1.1 -L --retry 5 --retry-delay 2 -A "${userAgent}" -f -s -S -o "${dest}" "${url}"`, { stdio: 'inherit' });
       if (!dest.endsWith('.exe')) {
         try { fs.chmodSync(dest, '755'); } catch (e) {}
       }
       console.log(`Done: ${path.basename(dest)}`);
       return resolve();
     } catch (e) {
-      console.warn(`curl failed, falling back to node https: ${e.message}`);
+      console.warn(`curl failed, trying standard curl: ${e.message}`);
     }
 
-    // Method 2: Fallback to Node.js https
+    // Method 2: Standard curl fallback
+    try {
+      execSync(`curl -L --retry 3 -A "${userAgent}" -f -s -S -o "${dest}" "${url}"`, { stdio: 'inherit' });
+      if (!dest.endsWith('.exe')) {
+        try { fs.chmodSync(dest, '755'); } catch (e) {}
+      }
+      console.log(`Done: ${path.basename(dest)}`);
+      return resolve();
+    } catch (e) {
+      console.warn(`standard curl failed, trying node https fallback...`);
+    }
+
+    // Method 3: Fallback to Node.js https
     const file = fs.createWriteStream(dest);
     
     function fetch(reqUrl, redirects = 0) {
@@ -75,7 +87,13 @@ function downloadFile(url, dest) {
         } catch (err) {
           console.warn(`[WARNING] Failed to download ${f.name}: ${err.message}`);
           if (process.platform === 'darwin' && f.name === 'yt-dlp_macos') {
-            console.error(`[CRITICAL] Essential macOS binary ${f.name} failed to download.`);
+            console.error(`\n===============================================================`);
+            console.error(`[MANUAL STEP REQUIRED] Network blocked automated GitHub release download.`);
+            console.error(`Please download yt-dlp_macos directly from your browser:`);
+            console.error(`👉 https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos`);
+            console.error(`And place it into the folder: ${BINS_DIR}/yt-dlp_macos`);
+            console.error(`Then make it executable: chmod +x ${BINS_DIR}/yt-dlp_macos`);
+            console.error(`===============================================================\n`);
             process.exit(1);
           } else if (process.platform === 'win32' && f.name === 'yt-dlp.exe') {
             console.error(`[CRITICAL] Essential Windows binary ${f.name} failed to download.`);
