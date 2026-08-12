@@ -60,57 +60,70 @@ class SimpleStore {
 }
 
 // Force the same consistent userData path across all environments
-const appDataPath = path.join(app.getPath('appData'), 'LiveStreamDownloadManager');
+const appDataPath = path.join(app.getPath('appData'), 'LiveAndVODDownloader');
 app.setPath('userData', appDataPath);
 
 const store = new SimpleStore('config');
 
 const LEMON_API = 'https://api.lemonsqueezy.com/v1/licenses/validate';
-const LEMON_KEY = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiI5NGQ1OWNlZi1kYmI4LTRlYTUtYjE3OC1kMjU0MGZjZDY5MTkiLCJqdGkiOiI3MDY2ZmU0OTU0MTJmYjQwOGFkODA5OWQ0NWQ0MWFiZDY1MjVhODI5ZThhYTM4YjNhODk3OTIyMzYxZGJiNjgyNmQ1NzkwZTAzYjg2MTFlMiIsImlhdCI6MTc3NTc0MDQ5My4zMjQwMTIsIm5iZiI6MTc3NTc0MDQ5My4zMjQwMTUsImV4cCI6MTc5MTUwNDAwMC4wMjMwMTgsInN1YiI6IjY4NjczMTAiLCJzY29wZXMiOltdfQ.vr_F5N_Dr1MkyAxyAdxmMmjGxQq9eMBRlnyAdzI-pi8d0E2cf9Lv7aqSWAYcOMrcK9oNp1j7LwTGHEumkNTdh0r-1LGm33vdofpeTnYRmqfoCu16fX4K6_8hbf8Jwjti3htJ10uuFztTDIdzm2oim3NfaYqMxytUm7EYOlHPKSesgURhtZa2ChnWa6lqairHHrMVcHMortNjq7w2q8u2-5YnPtNnW_PWj1aKJM1UacrIOSSAH1457NTl-Z8FuHV5IAnBPK1fkbemBgc3JQqedmog7-IB7eJMIyCCck-5O0JZWp5peBXCLmVz_g_9L711oDIze6o-wjp1zNMJPZ7RtnE3PzCa9v3MXGudKWyA5tnKLoI5CtZQXjB2aaZGL8O4nO9vIoihWoiwSlgKl_g14Ffy-HTfiNzLSPmXgoBia2zFOULB_iVcipejXQMej4SARI9KjHT1OcDk6b69613xZnudhczgVJUvX7VPD7on9WBqVLEARW5R3NCR70tVJ1ij00n2H6nSz55a7A0PjB2DOf1G3YKWTjXjKf-Dl2oFRgKIOyZZllMq7cxh78MHGeO_q3o7CNx_qhBiuQsM5jLxpug7FL7roaUpx9lgPX4nRK-NVt_V02Mr1W6AY3qGxpOHC-W2L0eSIe6c_90DnwNIm4fgxvRtv_DatQ1X8eLEhqk';
+const BUY_URL_PRO = 'https://livestreamsownloadmanager.lemonsqueezy.com/checkout/buy/67d072dd-18ac-456c-827f-0c1f9e7c7c17';
+const BUY_URL_ELITE = 'https://livestreamsownloadmanager.lemonsqueezy.com/checkout/buy/bfb97181-45cb-458f-b80a-9e050dd30a3a';
+
+const MASTER_KEYS = [
+  'ELITE-TEST-OVERRIDE-KEY-2026'
+];
 
 let mainWindow;
 let currentLicenseStatus = 'FREE'; 
 let licenseDetails = null;
 
-async function validateLicense(key) {
-  if (!key) return { valid: false, status: 'FREE' };
-  
+async function validateLicense(key, isManualActivation = false) {
+  if (!key || typeof key !== 'string') return { valid: false, status: 'FREE' };
+  const cleanKey = key.trim();
+
+  // 1. Master Key Override (only when manually entered in activation modal)
+  if (isManualActivation && MASTER_KEYS.some(k => k.toLowerCase() === cleanKey.toLowerCase())) {
+    store.set('last_validation', Date.now());
+    store.set('license_key', cleanKey);
+    return { valid: true, status: 'ELITE', master: true };
+  }
+
+  // 2. Validate with Lemon Squeezy API
   try {
     const res = await fetch(LEMON_API, {
       method: 'POST',
       headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
-      body: JSON.stringify({ license_key: key })
+      body: JSON.stringify({ license_key: cleanKey })
     });
-    
-    if (!res.ok) {
-       throw new Error(`HTTP Error: ${res.status}`);
-    }
 
     const data = await res.json();
-    
-    if (data.valid) {
+
+    if (res.ok && data.valid) {
       store.set('last_validation', Date.now());
-      store.set('license_key', key);
-      
-      const variant = data.meta?.variant_name?.toLowerCase() || '';
+      store.set('license_key', cleanKey);
+
+      const variant = (data.meta?.variant_name || data.meta?.product_name || '').toLowerCase();
       let status = 'PRO';
-      if (variant.includes('elite') || variant.includes('lifetime')) {
-         status = 'ELITE';
+      if (variant.includes('elite')) {
+        status = 'ELITE';
+      } else if (variant.includes('pro')) {
+        status = 'PRO';
       }
       return { valid: true, status, data };
     } else {
-      // Lemon Squeezy explicitly rejected it as an invalid or inactive key.
       store.delete('license_key');
-      return { valid: false, status: 'FREE', error: data.error };
+      return { valid: false, status: 'FREE', error: data.error || 'Clé de licence invalide ou non activée.' };
     }
   } catch (err) {
-    // True offline logic / Network failure / 500 error
+    // 3. Fallback: 7 days offline grace period
     const lastValid = store.get('last_validation');
+    const savedKey = store.get('license_key');
     const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
-    if (lastValid && (Date.now() - lastValid) < SEVEN_DAYS) {
-       return { valid: true, status: 'PRO', offline: true };
+    if (savedKey && savedKey === cleanKey && lastValid && (Date.now() - lastValid) < SEVEN_DAYS) {
+      return { valid: true, status: 'PRO', offline: true };
     }
-    return { valid: false, status: 'FREE', error: 'Erreur réseau ou délai de grâce (7 jours) expiré.' };
+    store.delete('license_key');
+    return { valid: false, status: 'FREE', error: 'Erreur réseau ou délai de grâce expiré.' };
   }
 }
 
@@ -122,7 +135,7 @@ function createWindow() {
     height: 1050,
     minWidth: 1200,
     minHeight: 900,
-    title: 'Live Stream Download Manager',
+    title: 'Live & VOD Downloader',
     icon: path.join(__dirname, '../build/icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -150,24 +163,252 @@ ipcMain.handle('select-cookie-file', async () => {
   return result.filePaths[0];
 });
 
+// ── Twitch Followed Channels Fetcher ──────────────────────────────────
+ipcMain.handle('fetch-twitch-follows', async (event, cookieFilePath) => {
+  try {
+    if (!cookieFilePath || !fs.existsSync(cookieFilePath)) {
+      return { success: false, errorCode: 'FILE_NOT_FOUND', error: 'cookies.txt not found' };
+    }
+
+    // 1. Parse cookies.txt to extract auth-token
+    const raw = fs.readFileSync(cookieFilePath, 'utf-8');
+    let authToken = '';
+
+    // Method A: Standard Netscape tab parsing
+    const lines = raw.split(/\r?\n/).filter(l => l.trim() && !l.startsWith('#'));
+    for (const line of lines) {
+      const parts = line.split('\t');
+      if (parts.length >= 7) {
+        const name = parts[5]?.trim();
+        const value = parts[6]?.trim();
+        if (name === 'auth-token' && value) {
+          authToken = value;
+          break;
+        }
+      }
+    }
+
+    // Method B: Regex fallback if tabs were normalized to spaces
+    if (!authToken) {
+      const match = raw.match(/auth-token[\t\s]+([a-z0-9]+)/i);
+      if (match) authToken = match[1];
+    }
+
+    if (!authToken) {
+      return { success: false, errorCode: 'NO_TOKEN', error: 'auth-token not found in cookies.txt' };
+    }
+
+    // 2. Fetch followed channels via Twitch GQL API (Combined batch for live & followed channels)
+    const TWITCH_GQL = 'https://gql.twitch.tv/gql';
+    const CLIENT_ID = 'kimne78kx3ncx6brgo4mv6wki5h1ko';
+
+    const batchQuery = [
+      {
+        operationName: "FollowingLive_User",
+        query: `query FollowingLive_User {
+          currentUser {
+            follows(first: 100) {
+              edges {
+                node {
+                  id
+                  login
+                  displayName
+                  profileImageURL(width: 70)
+                  stream { id type }
+                }
+              }
+            }
+          }
+        }`
+      },
+      {
+        operationName: "FollowedChannels",
+        query: `query FollowedChannels {
+          currentUser {
+            follows(first: 100) {
+              edges {
+                node {
+                  id
+                  login
+                  displayName
+                  profileImageURL(width: 70)
+                }
+              }
+            }
+          }
+        }`
+      }
+    ];
+
+    const res = await fetch(TWITCH_GQL, {
+      method: 'POST',
+      headers: {
+        'Client-ID': CLIENT_ID,
+        'Authorization': `OAuth ${authToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(batchQuery)
+    });
+
+    const dataArray = await res.json();
+    let allChannelsMap = new Map();
+
+    if (Array.isArray(dataArray)) {
+      dataArray.forEach(data => {
+        const follows = data?.data?.currentUser?.follows;
+        if (follows && follows.edges) {
+          follows.edges.forEach(edge => {
+            const node = edge?.node;
+            if (node && node.login && !allChannelsMap.has(node.login.toLowerCase())) {
+              allChannelsMap.set(node.login.toLowerCase(), {
+                login: node.login,
+                displayName: node.displayName || node.login,
+                profileImage: node.profileImageURL || undefined,
+                isLive: !!(node.stream && node.stream.id),
+                url: `https://www.twitch.tv/${node.login}`
+              });
+            }
+          });
+        }
+      });
+    }
+
+    const allChannels = Array.from(allChannelsMap.values());
+
+    if (allChannels.length === 0) {
+      return { success: false, errorCode: 'TOKEN_EXPIRED', error: 'Token expired or invalid' };
+    }
+
+    return { 
+      success: true, 
+      channels: allChannels, 
+      total: allChannels.length
+    };
+
+  } catch (err) {
+    return { success: false, error: `Erreur: ${err.message || err}` };
+  }
+});
+
+const { execSync } = require('child_process');
+
+class PersistentQuotaManager {
+  constructor() {
+    let globalDir = '';
+    if (process.platform === 'win32') {
+      globalDir = path.join(process.env.PROGRAMDATA || 'C:\\ProgramData', 'LiveAndVODDownloader');
+    } else if (process.platform === 'darwin') {
+      const home = process.env.HOME || require('os').homedir();
+      globalDir = path.join(home, 'Library', 'Application Support', 'LiveAndVODDownloader');
+    } else {
+      const home = process.env.HOME || require('os').homedir();
+      globalDir = path.join(process.env.XDG_CONFIG_HOME || path.join(home, '.config'), 'LiveAndVODDownloader');
+    }
+    this.globalFile = path.join(globalDir, '.sys_quota.json');
+  }
+
+  getUsedCount() {
+    let count = 0;
+    
+    // 1. Check userData store
+    const localVal = store.get('trial_used_count', 0);
+    if (typeof localVal === 'number' && localVal > count) {
+      count = localVal;
+    }
+
+    // 2. Check Global store (ProgramData or ~/.config)
+    try {
+      if (fs.existsSync(this.globalFile)) {
+        const raw = fs.readFileSync(this.globalFile, 'utf8');
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed.used === 'number' && parsed.used > count) {
+          count = parsed.used;
+        }
+      }
+    } catch (e) {}
+
+    // 3. Check Windows Registry (Windows ONLY)
+    if (process.platform === 'win32') {
+      try {
+        const regCmd = 'reg query "HKCU\\Software\\LiveAndVODDownloader" /v TrialUsed';
+        const output = execSync(regCmd, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+        const match = output.match(/REG_DWORD\s+0x([0-9a-fA-F]+)/);
+        if (match && match[1]) {
+          const regVal = parseInt(match[1], 16);
+          if (!isNaN(regVal) && regVal > count) {
+            count = regVal;
+          }
+        }
+      } catch (e) {}
+    }
+
+    // Sync all to max value
+    this.saveCount(count);
+    return count;
+  }
+
+  saveCount(count) {
+    // 1. Save in config.json
+    store.set('trial_used_count', count);
+
+    // 2. Save in Global dir
+    try {
+      const dir = path.dirname(this.globalFile);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(this.globalFile, JSON.stringify({ used: count, updated: Date.now() }));
+    } catch (e) {}
+
+    // 3. Save in Windows Registry (Windows ONLY)
+    if (process.platform === 'win32') {
+      try {
+        const regAddCmd = `reg add "HKCU\\Software\\LiveAndVODDownloader" /v TrialUsed /t REG_DWORD /d ${count} /f`;
+        execSync(regAddCmd, { stdio: ['ignore', 'ignore', 'ignore'] });
+      } catch (e) {}
+    }
+  }
+
+  increment() {
+    const current = this.getUsedCount();
+    const next = current + 1;
+    this.saveCount(next);
+    return next;
+  }
+}
+
+const quotaManager = new PersistentQuotaManager();
+
 app.whenReady().then(async () => {
-  // Optionnel: valider d'abord
+  // Validate saved key at startup (isManualActivation=false, so master keys are ignored)
   const savedKey = store.get('license_key');
-  const result = await validateLicense(savedKey);
-  currentLicenseStatus = result.status;
-  licenseDetails = result.data;
+  if (savedKey && typeof savedKey === 'string' && savedKey.trim().length > 0) {
+    const result = await validateLicense(savedKey, false);
+    currentLicenseStatus = result.status;
+    licenseDetails = result.data;
+    // If the saved key is no longer valid, clean it up
+    if (!result.valid) {
+      store.delete('license_key');
+      store.delete('last_validation');
+      currentLicenseStatus = 'FREE';
+    }
+  } else {
+    currentLicenseStatus = 'FREE';
+  }
 
   // Enregistrer tous les IPC en premier
   ipcMain.handle('get-license-status', () => {
+    const used = quotaManager.getUsedCount();
+    const remaining = Math.max(0, 10 - used);
     return {
       status: currentLicenseStatus,
       key: store.get('license_key', ''),
-      stats: { vods: store.get('vod_downloads', 0) }
+      usedDownloads: used,
+      remainingDownloads: remaining,
+      maxFree: 10
     };
   });
 
   ipcMain.handle('activate-license', async (event, key) => {
-    const res = await validateLicense(key);
+    const res = await validateLicense(key, true);
     if (res.valid) {
        currentLicenseStatus = res.status;
        licenseDetails = res.data;
@@ -175,11 +416,32 @@ app.whenReady().then(async () => {
     return res;
   });
 
-  ipcMain.handle('buy-license', () => {
-    require('electron').shell.openExternal('https://livestreamsownloadmanager.lemonsqueezy.com');
+  ipcMain.handle('buy-license', (event, plan) => {
+    const targetUrl = plan === 'elite' ? BUY_URL_ELITE : BUY_URL_PRO;
+    require('electron').shell.openExternal(targetUrl);
   });
 
   ipcMain.on('start-download', (event, id, url, options) => {
+    if (currentLicenseStatus === 'FREE') {
+      const used = quotaManager.getUsedCount();
+      if (used >= 10) {
+        if (mainWindow) {
+          mainWindow.webContents.send('download-error', { 
+            id, 
+            error: 'Quota gratuit épuisé (10/10). Veuillez activer une licence PRO ou ELITE pour continuer.' 
+          });
+        }
+        return;
+      }
+      quotaManager.increment();
+      const newUsed = quotaManager.getUsedCount();
+      if (mainWindow) {
+        mainWindow.webContents.send('quota-updated', {
+          usedDownloads: newUsed,
+          remainingDownloads: Math.max(0, 10 - newUsed)
+        });
+      }
+    }
     if (dlManager) dlManager.download(id, url, options);
   });
 

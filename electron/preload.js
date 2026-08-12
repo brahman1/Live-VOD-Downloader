@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onDownloadDestination: (callback) => ipcRenderer.on('download-destination', (_event, data) => callback(data)),
   onDownloadError: (callback) => ipcRenderer.on('download-error', (_event, data) => callback(data)),
   onDownloadComplete: (callback) => ipcRenderer.on('download-complete', (_event, data) => callback(data)),
+  onQuotaUpdated: (callback) => ipcRenderer.on('quota-updated', (_event, data) => callback(data)),
   onLog: (callback) => ipcRenderer.on('log', (_event, data) => callback(data)),
   cancelDownload: (id) => ipcRenderer.send('cancel-download', id),
   pauseDownload: (id) => ipcRenderer.send('pause-download', id),
@@ -20,7 +21,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   removeDownload: (id) => ipcRenderer.send('remove-download', id),
   getLicenseStatus: () => ipcRenderer.invoke('get-license-status'),
   activateLicense: (key) => ipcRenderer.invoke('activate-license', key),
-  buyLicense: () => ipcRenderer.invoke('buy-license'),
+  buyLicense: (plan) => ipcRenderer.invoke('buy-license', plan),
   getSavedFolder: () => ipcRenderer.invoke('get-saved-folder'),
-  saveOutputFolder: (folder) => ipcRenderer.send('save-output-folder', folder)
+  saveOutputFolder: (folder) => ipcRenderer.send('save-output-folder', folder),
+  fetchTwitchFollows: (cookiePath) => ipcRenderer.invoke('fetch-twitch-follows', cookiePath)
 });

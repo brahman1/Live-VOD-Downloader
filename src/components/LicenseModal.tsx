@@ -6,12 +6,16 @@ interface Props {
   t: Translator;
   onClose: () => void;
   onSuccess: (status: string) => void;
+  remainingDownloads?: number;
+  usedDownloads?: number;
 }
 
-export default function LicenseModal({ t, onClose, onSuccess }: Props) {
+export default function LicenseModal({ t, onClose, onSuccess, remainingDownloads = 10, usedDownloads = 0 }: Props) {
   const [key, setKey] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  const isExhausted = remainingDownloads <= 0;
 
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,15 +41,15 @@ export default function LicenseModal({ t, onClose, onSuccess }: Props) {
     }
   };
 
-  const handleBuy = () => {
+  const handleBuy = (plan: 'pro' | 'elite' = 'pro') => {
     const api = (window as any).electronAPI;
     if (api && api.buyLicense) {
-      api.buyLicense();
+      api.buyLicense(plan);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-in fade-in duration-300">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-4 animate-in fade-in duration-300">
       <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col">
         {/* Header */}
         <div className="p-6 pb-4 border-b border-white/5 relative overflow-hidden bg-gradient-to-b from-cyan-500/10 to-transparent">
@@ -57,15 +61,32 @@ export default function LicenseModal({ t, onClose, onSuccess }: Props) {
             </div>
             <div>
               <h2 className="text-xl font-bold text-white tracking-tight">{t('ACTIVATE_PRO')}</h2>
-              <p className="text-xs text-slate-400 mt-1">Live Stream Download Manager</p>
+              <p className="text-xs text-slate-400 mt-1">Live & VOD Downloader</p>
             </div>
           </div>
         </div>
 
         {/* Content */}
-        <div className="p-6 flex-1">
-          <form onSubmit={handleVerify} className="space-y-5">
-            
+        <div className="p-6 flex-1 space-y-5">
+          
+          {/* Trial Quota Banner */}
+          {isExhausted ? (
+            <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-center">
+              <div className="text-red-400 font-bold text-sm mb-1">⚠️ {t('TRIAL_EXHAUSTED')}</div>
+              <div className="text-slate-300 text-xs leading-relaxed">{t('TRIAL_EXHAUSTED_DESC')}</div>
+            </div>
+          ) : (
+            <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-xl p-3 flex items-center justify-between">
+              <span className="text-xs font-semibold text-cyan-300">
+                ⚡ Offre d'essai gratuite :
+              </span>
+              <span className="text-xs font-black bg-cyan-500/20 text-cyan-400 px-2.5 py-1 rounded-lg border border-cyan-500/30">
+                {remainingDownloads} / 10 restants
+              </span>
+            </div>
+          )}
+
+          <form onSubmit={handleVerify} className="space-y-4">
             <div className="space-y-2">
               <label className="text-sm font-medium text-slate-300 flex items-center gap-2">
                 <KeyRound className="w-4 h-4 text-cyan-400" />
@@ -96,22 +117,33 @@ export default function LicenseModal({ t, onClose, onSuccess }: Props) {
             </button>
           </form>
 
-          <div className="mt-8 pt-6 border-t border-slate-800">
-             <button
-                type="button"
-                onClick={handleBuy}
-                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-medium bg-slate-800 text-white hover:bg-slate-700 transition-colors border border-slate-700"
-             >
-                {t('BUY_LICENSE')} <ExternalLink className="w-4 h-4 text-slate-400" />
-             </button>
+          <div className="pt-3 border-t border-slate-800 space-y-2">
+             <div className="text-xs text-slate-400 font-medium mb-1">Acheter une licence illimitée :</div>
+             <div className="grid grid-cols-2 gap-2">
+               <button
+                  type="button"
+                  onClick={() => handleBuy('pro')}
+                  className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-cyan-400 transition-colors border border-slate-700/80"
+               >
+                  Acheter PRO <ExternalLink className="w-3 h-3" />
+               </button>
+               <button
+                  type="button"
+                  onClick={() => handleBuy('elite')}
+                  className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-xs font-bold bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 transition-colors border border-purple-500/30"
+               >
+                  Acheter ELITE <ExternalLink className="w-3 h-3" />
+               </button>
+             </div>
              
-             {/* Small dismiss button for those who want to use the Free version */}
-             <button 
-               onClick={onClose}
-               className="w-full mt-4 text-xs text-slate-500 hover:text-slate-300 transition-colors"
-             >
-               Continuer avec la version Gratuite (Continue Free)
-             </button>
+             {!isExhausted && (
+               <button 
+                 onClick={onClose}
+                 className="w-full pt-2 text-xs text-slate-500 hover:text-slate-300 transition-colors text-center"
+               >
+                 Continuer avec l'offre gratuite ({remainingDownloads} restants)
+               </button>
+             )}
           </div>
         </div>
       </div>

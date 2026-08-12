@@ -1,5 +1,5 @@
 {
-  "name": "live-stream-download-manager-pro",
+  "name": "live-and-vod-downloader",
   "version": "1.2.0",
   "main": "electron/main.js",
   "scripts": {
@@ -14,8 +14,8 @@
     "build:all": "npm run build:base && electron-builder -wml"
   },
   "build": {
-    "appId": "com.brahim.livestreammanager",
-    "productName": "Live Stream Download Manager",
+    "appId": "com.brahim.liveandvoddownloader",
+    "productName": "Live & VOD Downloader",
     "directories": {
       "output": "release"
     },
@@ -82,7 +82,7 @@
   "keywords": [],
   "author": "Brahim",
   "license": "ISC",
-  "description": "Live Stream Download Manager",
+  "description": "Live & VOD Downloader",
   "dependencies": {
     "clsx": "^2.1.1",
     "electron-store": "^8.2.0",

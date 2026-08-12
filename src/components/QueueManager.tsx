@@ -29,35 +29,35 @@ export default function QueueManager({ tasks, onCancel, onPause, onResume, onRem
 
   if (tasks.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 text-slate-500 animate-in fade-in">
-        <div className="w-24 h-24 bg-slate-900 rounded-full flex items-center justify-center mb-6">
-          <FileVideo className="w-10 h-10 text-slate-700" />
+      <div className="flex flex-col items-center justify-center py-20 text-slate-500 animate-in fade-in bg-white border border-slate-200 rounded-3xl shadow-sm">
+        <div className="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center mb-6 border border-slate-200">
+          <FileVideo className="w-10 h-10 text-slate-400" />
         </div>
-        <h3 className="text-xl font-medium text-slate-300">{t('QUEUE_EMPTY')}</h3>
-        <p className="text-sm mt-2">{t('QUEUE_EMPTY_DESC')}</p>
+        <h3 className="text-xl font-extrabold text-slate-800">{t('QUEUE_EMPTY')}</h3>
+        <p className="text-sm mt-2 font-medium text-slate-500">{t('QUEUE_EMPTY_DESC')}</p>
       </div>
     );
   }
 
   return (
     <div className="space-y-4 animate-in fade-in flex-1 overflow-y-auto pr-2 pb-20">
-      <h2 className="text-xl font-bold text-white mb-6">{t('ACTIVE_DOWNLOADS')}</h2>
+      <h2 className="text-xl font-black text-slate-900 mb-6">{t('ACTIVE_DOWNLOADS')}</h2>
 
       {tasks.slice().reverse().map((task) => (
-        <div key={task.id} className="bg-slate-900 border border-slate-700/50 p-4 rounded-2xl flex flex-col gap-3 transition-all duration-300 hover:border-slate-600/50">
+        <div key={task.id} className="bg-white border border-slate-200/90 p-4 rounded-2xl flex flex-col gap-3 transition-all duration-300 shadow-sm hover:shadow-md hover:border-slate-300">
 
           {/* Top row: thumbnail + meta */}
           <div className="flex gap-4 items-start">
             {/* Thumbnail placeholder */}
-            <div className="w-24 h-16 bg-slate-800 rounded-xl shrink-0 border border-white/5 relative overflow-hidden flex items-center justify-center">
-              <div className="absolute inset-0 bg-gradient-to-tr from-cyan-900/20 to-purple-900/20"></div>
-              <Play className="w-5 h-5 text-slate-500" />
-              <div className="absolute top-1 left-1 bg-black/60 px-1.5 py-0.5 rounded text-[10px] font-bold text-white">LIVE</div>
+            <div className="w-24 h-16 bg-slate-100 rounded-xl shrink-0 border border-slate-200 relative overflow-hidden flex items-center justify-center shadow-sm">
+              <div className="absolute inset-0 bg-gradient-to-tr from-cyan-100/50 to-purple-100/50"></div>
+              <Play className="w-5 h-5 text-slate-400" />
+              <div className="absolute top-1 left-1 bg-red-500 px-1.5 py-0.5 rounded text-[10px] font-bold text-white shadow-md shadow-red-500/20">LIVE</div>
             </div>
 
             {/* URL + format meta */}
             <div className="flex-1 min-w-0">
-              <h4 className="text-sm font-medium text-slate-200 truncate leading-relaxed" title={task.url}>{task.url}</h4>
+              <h4 className="text-sm font-bold text-slate-900 truncate leading-relaxed" title={task.url}>{task.url}</h4>
               <div className="text-xs text-slate-500 flex gap-2 mt-1">
                 <span className="capitalize">{task.options.format}</span>
                 <span>•</span>
@@ -106,11 +106,11 @@ export default function QueueManager({ tasks, onCancel, onPause, onResume, onRem
             {(task.status === 'completed' || task.status === 'error' || task.status === 'downloading' || task.status === 'paused') && (
               <button
                 onClick={() => onRemove(task.id)}
-                className="flex items-center gap-1.5 py-1.5 px-3 bg-slate-800 text-slate-400 hover:bg-red-500/10 hover:text-red-400 rounded-lg transition-all duration-300 cursor-pointer group text-xs border border-transparent hover:border-red-500/30"
+                className="flex items-center gap-1.5 py-1.5 px-3 bg-white text-slate-600 hover:bg-red-50 hover:text-red-600 rounded-lg transition-all duration-300 cursor-pointer group text-xs border border-slate-200 hover:border-red-200 shadow-sm"
                 title={t('REMOVE_BTN')}
               >
                 <Trash2 className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
-                <span className="font-medium">{t('REMOVE_BTN')}</span>
+                <span className="font-bold">{t('REMOVE_BTN')}</span>
               </button>
             )}
           </div>
@@ -155,11 +155,11 @@ export default function QueueManager({ tasks, onCancel, onPause, onResume, onRem
 
           {task.status === 'downloading' && (
             <div className="space-y-2">
-              <div className="flex justify-between text-xs font-medium text-cyan-400">
+              <div className="flex justify-between text-xs font-bold text-cyan-600">
                 <span className="animate-pulse">{t('RECORDING')}</span>
                 <span>{task.progress}%</span>
               </div>
-              <div className="w-full bg-slate-950 rounded-full h-2 overflow-hidden border border-white/5">
+              <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden border border-slate-200 shadow-inner">
                 <div
                   className="bg-gradient-to-r from-cyan-500 to-purple-500 h-2 rounded-full transition-all duration-300"
                   style={{ width: `${Math.max(5, task.progress)}%` }}

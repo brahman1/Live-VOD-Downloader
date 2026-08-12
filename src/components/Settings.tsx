@@ -5,28 +5,31 @@ interface SettingsProps {
   language: Language;
   setLanguage: (lang: Language) => void;
   t: Translator;
+  outputFolder: string;
+  setOutputFolder: (folder: string) => void;
+  defaultFolder: string;
 }
 
-export default function Settings({ language, setLanguage, t }: SettingsProps) {
+export default function Settings({ language, setLanguage, t, outputFolder, setOutputFolder, defaultFolder }: SettingsProps) {
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500 pb-20">
       
       {/* Language & Localisation */}
-      <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl">
+      <div className="bg-white border border-slate-200/90 p-6 rounded-2xl shadow-sm">
         <div className="flex items-start gap-4 mb-4">
-          <div className="p-3 bg-indigo-500/10 rounded-xl">
-            <Globe className="w-6 h-6 text-indigo-400" />
+          <div className="p-3 bg-indigo-50 rounded-xl border border-indigo-100">
+            <Globe className="w-6 h-6 text-indigo-600" />
           </div>
           <div className="flex-1">
-            <h3 className="text-lg font-semibold text-white">{t('LANGUAGE')}</h3>
-            <p className="text-sm text-slate-400">{t('LANGUAGE_DESC')}</p>
+            <h3 className="text-lg font-bold text-slate-900">{t('LANGUAGE')}</h3>
+            <p className="text-sm text-slate-500 font-medium">{t('LANGUAGE_DESC')}</p>
           </div>
         </div>
         <div className="mt-4 max-w-xs">
            <select 
               value={language}
               onChange={(e) => setLanguage(e.target.value as Language)}
-              className="w-full bg-slate-950 border border-slate-700 rounded-xl py-3 px-4 text-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all font-medium appearance-none hover:border-indigo-500/50 hover:shadow-[0_0_15px_rgba(99,102,241,0.2)]"
+              className="w-full bg-slate-50 border border-slate-300 rounded-xl py-3 px-4 text-slate-900 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all font-extrabold appearance-none hover:border-indigo-400 shadow-sm cursor-pointer"
            >
               <option value="en">🇬🇧 English</option>
               <option value="fr">🇫🇷 Français</option>
@@ -34,60 +37,93 @@ export default function Settings({ language, setLanguage, t }: SettingsProps) {
         </div>
       </div>
 
-      {/* Cloud Integration */}
-      <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl">
+      {/* Download Folder */}
+      <div className="bg-white border border-slate-200/90 p-6 rounded-2xl shadow-sm">
         <div className="flex items-start gap-4 mb-4">
-          <div className="p-3 bg-blue-500/10 rounded-xl">
-            <Cloud className="w-6 h-6 text-blue-400" />
+          <div className="p-3 bg-green-50 rounded-xl border border-green-100">
+            <Cloud className="w-6 h-6 text-green-600" />
           </div>
           <div className="flex-1">
-            <h3 className="text-lg font-semibold text-white">{t('CLOUD_SYNC_TITLE')}</h3>
-            <p className="text-sm text-slate-400">{t('CLOUD_SYNC_DESC')}</p>
+            <h3 className="text-lg font-bold text-slate-900">{t('DOWNLOAD_FOLDER_TITLE') || 'Dossier de destination'}</h3>
+            <p className="text-sm text-slate-500 font-medium">{t('DOWNLOAD_FOLDER_DESC') || 'Choisissez où enregistrer les vidéos et les lives'}</p>
+          </div>
+        </div>
+        <div className="flex gap-4 items-center">
+          <input 
+            type="text" 
+            readOnly 
+            value={outputFolder || defaultFolder} 
+            className="flex-1 bg-slate-50 border border-slate-300 rounded-xl py-3 px-4 text-slate-900 focus:outline-none transition-all font-medium text-sm"
+          />
+          <button 
+            onClick={async () => {
+               const folder = await window.electronAPI?.selectFolder();
+               if (folder) {
+                  setOutputFolder(folder);
+                  localStorage.setItem('customOutputFolder', folder);
+               }
+            }}
+            className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold shadow-md shadow-indigo-600/20 transition-all cursor-pointer"
+          >
+            {t('BROWSE') || 'Parcourir...'}
+          </button>
+        </div>
+      </div>
+
+      {/* Cloud Integration */}
+      <div className="bg-white border border-slate-200/90 p-6 rounded-2xl shadow-sm">
+        <div className="flex items-start gap-4 mb-4">
+          <div className="p-3 bg-blue-50 rounded-xl border border-blue-100">
+            <Cloud className="w-6 h-6 text-blue-600" />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-lg font-bold text-slate-900">{t('CLOUD_SYNC_TITLE')}</h3>
+            <p className="text-sm text-slate-500 font-medium">{t('CLOUD_SYNC_DESC')}</p>
           </div>
         </div>
         <div className="flex gap-4">
-          <button disabled className="px-4 py-2 bg-slate-800 text-slate-500 rounded-lg text-sm border border-slate-700 opacity-50 cursor-not-allowed">
+          <button disabled className="px-4 py-2 bg-slate-100 text-slate-400 rounded-xl text-sm border border-slate-200 font-bold opacity-60 cursor-not-allowed">
             {t('LINK_GDRIVE')}
           </button>
-          <button disabled className="px-4 py-2 bg-slate-800 text-slate-500 rounded-lg text-sm border border-slate-700 opacity-50 cursor-not-allowed">
+          <button disabled className="px-4 py-2 bg-slate-100 text-slate-400 rounded-xl text-sm border border-slate-200 font-bold opacity-60 cursor-not-allowed">
             {t('LINK_DROPBOX')}
           </button>
         </div>
       </div>
 
       {/* Cookies & Auth */}
-      <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl">
+      <div className="bg-white border border-slate-200/90 p-6 rounded-2xl shadow-sm">
         <div className="flex items-start gap-4 mb-4">
-          <div className="p-3 bg-cyan-500/10 rounded-xl">
-            <KeySquare className="w-6 h-6 text-cyan-400" />
+          <div className="p-3 bg-cyan-50 rounded-xl border border-cyan-100">
+            <KeySquare className="w-6 h-6 text-cyan-600" />
           </div>
           <div className="flex-1">
-            <h3 className="text-lg font-semibold text-white">{t('COOKIES_AUTH_TITLE')}</h3>
-            <p className="text-sm text-slate-400">{t('COOKIES_AUTH_DESC')}</p>
+            <h3 className="text-lg font-bold text-slate-900">{t('COOKIES_AUTH_TITLE')}</h3>
+            <p className="text-sm text-slate-500 font-medium">{t('COOKIES_AUTH_DESC')}</p>
           </div>
         </div>
-        <div className="bg-slate-950 rounded-xl p-4 border border-white/5 space-y-2">
-            <p className="text-sm text-slate-300">{t('COOKIES_FLOW_TITLE')}</p>
-            <ol className="text-sm text-slate-500 list-decimal pl-5 space-y-1">
+        <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 space-y-2">
+            <p className="text-sm font-bold text-slate-800">{t('COOKIES_FLOW_TITLE')}</p>
+            <ol className="text-sm text-slate-600 font-medium list-decimal pl-5 space-y-1">
                <li>{t('COOKIES_FLOW_1')}</li>
                <li>{t('COOKIES_FLOW_2')}</li>
                <li>{t('COOKIES_FLOW_3')}</li>
             </ol>
-            <div className="mt-4 flex items-center text-emerald-500 text-sm font-medium gap-2">
-               <CheckCircle2 className="w-4 h-4" /> {t('COOKIES_FLOW_PERM')}
+            <div className="mt-4 flex items-center text-emerald-700 text-sm font-bold gap-2">
+               <CheckCircle2 className="w-4 h-4 text-emerald-600" /> {t('COOKIES_FLOW_PERM')}
             </div>
         </div>
       </div>
 
       {/* Proxies */}
-      <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl opacity-50 pointer-events-none">
+      <div className="bg-white border border-slate-200/90 p-6 rounded-2xl opacity-60 pointer-events-none shadow-sm">
         <div className="flex items-start gap-4 mb-4">
-          <div className="p-3 bg-purple-500/10 rounded-xl">
-            <Server className="w-6 h-6 text-purple-400" />
+          <div className="p-3 bg-purple-50 rounded-xl border border-purple-100">
+            <Server className="w-6 h-6 text-purple-600" />
           </div>
           <div className="flex-1">
-            <h3 className="text-lg font-semibold text-white">{t('NETWORK_TITLE')}</h3>
-            <p className="text-sm text-slate-400">{t('NETWORK_DESC')}</p>
+            <h3 className="text-lg font-bold text-slate-900">{t('NETWORK_TITLE')}</h3>
+            <p className="text-sm text-slate-500 font-medium">{t('NETWORK_DESC')}</p>
           </div>
         </div>
       </div>

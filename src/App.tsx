@@ -1,12 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Home, ListVideo, Settings as SettingsIcon, Bug, Rss, Scissors, History } from 'lucide-react';
+import { Home, DownloadCloud, ListVideo, Settings as SettingsIcon, Bug, Rss, History } from 'lucide-react';
 import Dashboard from './components/Dashboard';
 import QueueManager from './components/QueueManager';
 import Settings from './components/Settings';
 import SupportModal from './components/SupportModal';
 import LicenseModal from './components/LicenseModal';
 import SocialHub from './components/SocialHub';
-import VideoMaker from './components/VideoMaker';
 import HistoryManager from './components/HistoryManager';
 import { DownloadTask, DownloadOptions } from './types';
 import locales from './locales.json';
@@ -43,15 +42,16 @@ export type Translator = (key: keyof typeof locales.en) => string;
 export type Language = 'en' | 'fr';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'queue' | 'history' | 'settings' | 'socialhub' | 'videomaker'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'queue' | 'history' | 'settings' | 'socialhub'>('dashboard');
   const [tasks, setTasks] = useState<DownloadTask[]>([]);
   const [logs, setLogs] = useState<{id: string|null, message: string}[]>([]);
   const [showSupportWindow, setShowSupportWindow] = useState(false);
   const [showLicenseModal, setShowLicenseModal] = useState(false);
   const [licenseStatus, setLicenseStatus] = useState<string>('FREE');
+  const [quota, setQuota] = useState<{ usedDownloads: number, remainingDownloads: number }>({ usedDownloads: 0, remainingDownloads: 10 });
   
   const [language, setLanguage] = useState<Language>('en');
-  const [outputFolder, setOutputFolder] = useState<string>('');
+  const [outputFolder, setOutputFolder] = useState<string>(() => localStorage.getItem('customOutputFolder') || '');
   const [defaultFolder, setDefaultFolder] = useState<string>('');
 
   const t: Translator = (key) => locales[language][key] || key;
@@ -59,25 +59,21 @@ export default function App() {
   useEffect(() => {
     const api = window.electronAPI as any;
     
-    // Concurrently load the saved custom folder and the system downloads folder
-    Promise.all([
-      api?.getSavedFolder?.(),
-      api?.getDownloadsPath?.()
-    ]).then(([savedFolder, defaultDownloadsPath]) => {
+    api?.getDownloadsPath?.().then((defaultDownloadsPath: string) => {
       if (defaultDownloadsPath) {
         setDefaultFolder(defaultDownloadsPath);
-      }
-      
-      if (savedFolder && savedFolder.trim() !== '') {
-         setOutputFolder(savedFolder);
-      } else if (defaultDownloadsPath) {
-         setOutputFolder(defaultDownloadsPath);
+        if (!localStorage.getItem('customOutputFolder')) {
+           setOutputFolder(defaultDownloadsPath);
+        }
       }
     });
     
     api?.getLicenseStatus?.().then((res: any) => {
-      if (res && res.status) {
-         setLicenseStatus(res.status);
+      if (res) {
+         if (res.status) setLicenseStatus(res.status);
+         if (typeof res.usedDownloads === 'number' && typeof res.remainingDownloads === 'number') {
+            setQuota({ usedDownloads: res.usedDownloads, remainingDownloads: res.remainingDownloads });
+         }
          if (res.status === 'FREE') {
             setShowLicenseModal(true);
          }
@@ -96,11 +92,23 @@ export default function App() {
       window.electronAPI.onDownloadError(({id, error}) => {
          if (id) {
            setTasks(prev => prev.map(task => task.id === id ? { ...task, status: 'error', errorMsg: error } : task));
+           // If error is about quota exhausted, pop up license modal
+           if (error && error.includes('Quota')) {
+              setShowLicenseModal(true);
+           }
          }
       });
 
       window.electronAPI.onDownloadComplete(({id}) => {
          setTasks(prev => prev.map(task => task.id === id ? { ...task, status: 'completed', progress: 100 } : task));
+      });
+
+      const apiAny = window.electronAPI as any;
+      apiAny.onQuotaUpdated?.(({ usedDownloads, remainingDownloads }: any) => {
+         setQuota({ usedDownloads, remainingDownloads });
+         if (remainingDownloads <= 0) {
+            setShowLicenseModal(true);
+         }
       });
 
       window.electronAPI.onLog((logData) => {
@@ -115,9 +123,12 @@ export default function App() {
       id, url, options, status: 'pending', progress: 0, speed: '', eta: '', size: '', destination: ''
     };
     setTasks(prev => [...prev, newTask]);
-    window.electronAPI?.download(id, url, { ...options, language });
+    
+    const finalFolder = options.outputFolder || outputFolder || defaultFolder;
+    
+    window.electronAPI?.download(id, url, { ...options, outputFolder: finalFolder, language });
     return id;
-  }, []); // stable reference — never recreated
+  }, [language, outputFolder, defaultFolder]);
 
   const handleCancelDownload = (id: string) => {
     window.electronAPI?.cancelDownload(id);
@@ -151,34 +162,34 @@ export default function App() {
   };
 
   return (
-    <div className="flex h-screen bg-slate-950 text-slate-100 font-sans overflow-hidden selection:bg-cyan-500/30">
+    <div className="flex h-screen bg-[#F1F5F9] text-slate-800 font-sans overflow-hidden selection:bg-cyan-500/20">
       
       {/* Sidebar */}
-      <aside className="w-64 bg-slate-950 border-r border-slate-800 flex flex-col z-10 shrink-0">
-         <div className="p-6">
-            <h1 className="text-2xl font-black bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-purple-500 mb-1 leading-tight tracking-tighter">
-              Live Stream <br/>
-              <span className="text-xl">Download Manager</span>
+      <aside className="w-64 bg-white border-r border-slate-200 flex flex-col z-10 shrink-0 shadow-sm">
+         <div className="p-5">
+            <h1 className="text-xl font-black bg-clip-text text-transparent bg-gradient-to-r from-cyan-600 via-indigo-600 to-purple-600 mb-1 leading-tight tracking-tighter">
+              Live & VOD <br/>
+              <span className="text-lg">Downloader</span>
             </h1>
          </div>
 
-         <nav className="flex-1 px-4 space-y-2 mt-4 text-sm font-medium">
+         <nav className="flex-1 px-3 space-y-1.5 mt-2 text-sm font-semibold overflow-y-auto hide-scrollbar">
             <button 
               onClick={() => setActiveTab('dashboard')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'dashboard' ? 'bg-cyan-500/10 text-cyan-400' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'}`}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${activeTab === 'dashboard' ? 'bg-cyan-500/10 text-cyan-700 font-black border-l-4 border-cyan-500 shadow-sm' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'}`}
             >
-              <Home className="w-5 h-5" /> {t('TAB_DASHBOARD')}
+              <DownloadCloud className="w-4 h-4 text-cyan-600" /> {t('TAB_DASHBOARD')}
             </button>
 
             <button 
               onClick={() => setActiveTab('queue')}
-              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all ${activeTab === 'queue' ? 'bg-cyan-500/10 text-cyan-400' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'}`}
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition-all ${activeTab === 'queue' ? 'bg-cyan-500/10 text-cyan-700 font-black border-l-4 border-cyan-500 shadow-sm' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'}`}
             >
               <div className="flex items-center gap-3">
-                <ListVideo className="w-5 h-5" /> {t('TAB_QUEUE')}
+                <ListVideo className="w-4 h-4 text-indigo-600" /> {t('TAB_QUEUE')}
               </div>
               {activeDownloads > 0 && (
-                <span className="bg-cyan-500 text-slate-900 w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold">
+                <span className="bg-cyan-600 text-white w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold shadow-sm">
                   {activeDownloads}
                 </span>
               )}
@@ -186,59 +197,48 @@ export default function App() {
 
             <button 
               onClick={() => setActiveTab('history')}
-              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all ${activeTab === 'history' ? 'bg-cyan-500/10 text-cyan-400' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'}`}
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition-all ${activeTab === 'history' ? 'bg-cyan-500/10 text-cyan-700 font-black border-l-4 border-cyan-500 shadow-sm' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'}`}
             >
               <div className="flex items-center gap-3">
-                <History className="w-5 h-5" /> {t('TAB_HISTORY')}
+                <History className="w-4 h-4 text-purple-600" /> {t('TAB_HISTORY')}
               </div>
             </button>
 
             <button 
               onClick={() => setActiveTab('socialhub')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'socialhub' ? 'bg-amber-500/10 text-amber-400' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'}`}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${activeTab === 'socialhub' ? 'bg-purple-500/10 text-purple-700 font-black border-l-4 border-purple-500 shadow-sm' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'}`}
             >
-              <Rss className="w-5 h-5" /> {t('TAB_SITTER')}
-            </button>
-
-            <button 
-              onClick={() => setActiveTab('videomaker')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'videomaker' ? 'bg-[#25F4EE]/10 text-[#FE2C55]' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'}`}
-            >
-              <Scissors className="w-5 h-5" /> {t('TAB_VIDEOMAKER') || 'Video Maker'}
+              <Rss className="w-4 h-4 text-amber-500" /> {t('TAB_SITTER')}
             </button>
 
             <button 
               onClick={() => setActiveTab('settings')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'settings' ? 'bg-cyan-500/10 text-cyan-400' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'}`}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${activeTab === 'settings' ? 'bg-cyan-500/10 text-cyan-700 font-black border-l-4 border-cyan-500 shadow-sm' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'}`}
             >
-              <SettingsIcon className="w-5 h-5" /> {t('SETTINGS_TITLE')}
+              <SettingsIcon className="w-4 h-4 text-slate-600" /> {t('SETTINGS_TITLE')}
             </button>
          </nav>
 
-         <div className="p-4 border-t border-slate-800 space-y-2">
-            <button 
-              onClick={() => setShowSupportWindow(true)}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-400 hover:text-slate-200 rounded-lg text-xs transition-colors"
-            >
-              <Bug className="w-4 h-4" /> {t('BUG_REPORT')}
-            </button>
+         <div className="p-3 border-t border-slate-200 space-y-2 bg-slate-50/80 shrink-0">
+            {/* Bug Report button removed per user request */}
 
             {licenseStatus === 'FREE' && (
               <button 
                 onClick={() => setShowLicenseModal(true)}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-500 hover:brightness-110 text-white font-medium rounded-lg text-xs transition-all shadow-lg shadow-cyan-500/20 border border-cyan-400/30"
+                className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:brightness-110 text-white font-extrabold rounded-xl text-xs transition-all shadow-md shadow-cyan-600/20 border border-cyan-500/30 cursor-pointer"
               >
                 {t('ACTIVATE_PRO')}
               </button>
             )}
             
-            <div className="text-center pt-2">
-               <span 
+            <div className="text-center pt-0.5">
+               <div 
                  onClick={() => licenseStatus === 'FREE' && setShowLicenseModal(true)}
-                 className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${licenseStatus === 'FREE' ? 'bg-slate-800 text-slate-400 cursor-pointer hover:bg-slate-700 hover:text-slate-300' : licenseStatus === 'ELITE' ? 'bg-purple-500/20 text-purple-400' : 'bg-cyan-500/20 text-cyan-400'}`}
+                 className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full inline-block ${licenseStatus === 'FREE' ? 'bg-slate-200 text-slate-700 cursor-pointer hover:bg-slate-300' : licenseStatus === 'ELITE' ? 'bg-purple-100 text-purple-700 border border-purple-200' : 'bg-cyan-100 text-cyan-800 border border-cyan-200'}`}
                >
                  {t(`VERSION_${licenseStatus}` as keyof typeof locales.en)}
-               </span>
+                 {licenseStatus === 'FREE' && ` (${quota.remainingDownloads}/10 restants)`}
+               </div>
             </div>
          </div>
       </aside>
@@ -261,6 +261,8 @@ export default function App() {
               setOutputFolder={setOutputFolder}
               defaultFolder={defaultFolder}
               licenseStatus={licenseStatus}
+              remainingDownloads={quota.remainingDownloads}
+              onOpenLicense={() => setShowLicenseModal(true)}
             />
           </div>
           
@@ -286,13 +288,20 @@ export default function App() {
           <div className={activeTab === 'socialhub' ? '' : 'hidden'}>
             <SocialHub onStartDownload={handleStartDownload} t={t} />
           </div>
-          {activeTab === 'videomaker' && <VideoMaker t={t} defaultFolder={defaultFolder} />}
-          {activeTab === 'settings' && <Settings language={language} setLanguage={setLanguage} t={t} />}
+          {activeTab === 'settings' && <Settings language={language} setLanguage={setLanguage} t={t} outputFolder={outputFolder} setOutputFolder={setOutputFolder} defaultFolder={defaultFolder} />}
         </div>
       </main>
 
       {showSupportWindow && <SupportModal logs={logs} onClose={() => setShowSupportWindow(false)} t={t} />}
-      {showLicenseModal && <LicenseModal onClose={() => setShowLicenseModal(false)} onSuccess={(st) => { setLicenseStatus(st); setShowLicenseModal(false); }} t={t} />}
+      {showLicenseModal && (
+        <LicenseModal 
+          onClose={() => setShowLicenseModal(false)} 
+          onSuccess={(st) => { setLicenseStatus(st); setShowLicenseModal(false); }} 
+          remainingDownloads={quota.remainingDownloads}
+          usedDownloads={quota.usedDownloads}
+          t={t} 
+        />
+      )}
     </div>
   );
 }

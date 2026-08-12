@@ -537,7 +537,7 @@ class YtDlpManager {
     if (os.platform() === 'win32') {
        exec(`taskkill /pid ${proc.pid} /T /F`);
     } else {
-       proc.kill('SIGKILL');
+       proc.kill('SIGINT');
     }
   }
 
@@ -558,7 +558,7 @@ class YtDlpManager {
         this.sendLog(id, 'Téléchargement suspendu. Le fichier partiel est conservé.');
       });
     } else {
-      try { proc.kill('SIGKILL'); } catch(e) {}
+      try { proc.kill('SIGINT'); } catch(e) {}
     }
   }
 
