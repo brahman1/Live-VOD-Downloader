@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { execSync } = require('child_process');
 const https = require('https');
 
 const BINS_DIR = path.join(__dirname, '../bin');
@@ -16,19 +17,25 @@ const FILES = [
 function downloadFile(url, dest) {
   return new Promise((resolve, reject) => {
     console.log(`Downloading ${path.basename(dest)}...`);
+    const userAgent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36';
+    
+    // Method 1: Try curl (built into macOS, Linux, and Windows 10/11) with retries
+    try {
+      execSync(`curl -L --retry 5 --retry-delay 2 -A "${userAgent}" -f -s -S -o "${dest}" "${url}"`, { stdio: 'inherit' });
+      if (!dest.endsWith('.exe')) {
+        try { fs.chmodSync(dest, '755'); } catch (e) {}
+      }
+      console.log(`Done: ${path.basename(dest)}`);
+      return resolve();
+    } catch (e) {
+      console.warn(`curl failed, falling back to node https: ${e.message}`);
+    }
+
+    // Method 2: Fallback to Node.js https
     const file = fs.createWriteStream(dest);
     
     function fetch(reqUrl, redirects = 0) {
-      const parsedUrl = new URL(reqUrl);
-      const options = {
-        hostname: parsedUrl.hostname,
-        path: parsedUrl.pathname + parsedUrl.search,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        }
-      };
-
-      https.get(options, (response) => {
+      https.get(reqUrl, { headers: { 'User-Agent': userAgent } }, (response) => {
         if (response.statusCode === 301 || response.statusCode === 302) {
           if (redirects > 5) return reject(new Error('Too many redirects'));
           return fetch(response.headers.location, redirects + 1);
@@ -67,7 +74,6 @@ function downloadFile(url, dest) {
           await downloadFile(f.url, dest);
         } catch (err) {
           console.warn(`[WARNING] Failed to download ${f.name}: ${err.message}`);
-          // If the failed file is for another OS, don't crash the build process
           if (process.platform === 'darwin' && f.name === 'yt-dlp_macos') {
             console.error(`[CRITICAL] Essential macOS binary ${f.name} failed to download.`);
             process.exit(1);
