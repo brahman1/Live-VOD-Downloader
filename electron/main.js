@@ -556,7 +556,12 @@ const WEBSITE_URL = 'https://brahman1.github.io/DownloaderWebSite/';
   });
 
   ipcMain.handle('check-app-update', async () => {
-    if (mainWindow) setupAutoUpdater(mainWindow);
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      if (latestAppUpdate) {
+        mainWindow.webContents.send('app-update-available', latestAppUpdate);
+      }
+      checkGitHubReleases(mainWindow);
+    }
   });
 
   // CREATE WINDOW LAST SO Handlers are ready when React loads
@@ -582,6 +587,8 @@ try {
 } catch (e) {
   console.log('[AutoUpdater Load Safe Fallback]', e.message);
 }
+
+let latestAppUpdate = null;
 
 function setupAutoUpdater(win) {
   if (process.platform === 'win32' && autoUpdater) {
@@ -626,23 +633,33 @@ function setupAutoUpdater(win) {
 
 async function checkGitHubReleases(win) {
   try {
-    const res = await fetch('https://api.github.com/repos/brahman1/DownloaderWebSite/releases/latest');
+    const res = await fetch('https://api.github.com/repos/brahman1/DownloaderWebSite/releases/latest', {
+      headers: {
+        'User-Agent': 'Live-VOD-Downloader-App',
+        'Accept': 'application/vnd.github.v3+json'
+      }
+    });
+
     if (res.ok) {
       const data = await res.json();
       const latestVersion = (data.tag_name || '').replace(/^[^\d]*/, '').trim();
       const currentVersion = app.getVersion();
       
       if (latestVersion && isNewerVersion(latestVersion, currentVersion)) {
+        latestAppUpdate = {
+          version: latestVersion,
+          releaseNotes: data.body || 'Une nouvelle mise à jour est disponible sur le site !',
+          downloadUrl: WEBSITE_URL
+        };
+
         if (win && !win.isDestroyed()) {
-          win.webContents.send('app-update-available', {
-            version: latestVersion,
-            releaseNotes: data.body || 'Une nouvelle mise à jour est disponible sur le site !',
-            downloadUrl: WEBSITE_URL
-          });
+          win.webContents.send('app-update-available', latestAppUpdate);
         }
       }
     }
-  } catch (e) {}
+  } catch (e) {
+    console.log('[CheckGitHubReleases Error]', e.message);
+  }
 }
 
 function isNewerVersion(latest, current) {

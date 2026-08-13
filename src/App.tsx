@@ -158,6 +158,8 @@ export default function App() {
           version: data.version
         }));
       });
+
+      apiAny.checkAppUpdate?.();
     }
   }, []);
 
