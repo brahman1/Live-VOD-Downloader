@@ -529,12 +529,10 @@ app.whenReady().then(async () => {
     store.set('output_folder', folder);
   });
 
-  ipcMain.handle('get-downloads-path', () => app.getPath('downloads'));
-
 const WEBSITE_URL = 'https://brahman1.github.io/DownloaderWebSite/';
 
   ipcMain.handle('start-app-update', async () => {
-    if (app.isPackaged) {
+    if (app.isPackaged && autoUpdater && process.platform === 'win32') {
       try {
         await autoUpdater.downloadUpdate();
         return { success: true };
@@ -549,7 +547,11 @@ const WEBSITE_URL = 'https://brahman1.github.io/DownloaderWebSite/';
   });
 
   ipcMain.handle('install-app-update', () => {
-    autoUpdater.quitAndInstall();
+    if (autoUpdater) {
+      try {
+        autoUpdater.quitAndInstall();
+      } catch (e) {}
+    }
   });
 
   ipcMain.handle('check-app-update', async () => {
@@ -569,49 +571,53 @@ const WEBSITE_URL = 'https://brahman1.github.io/DownloaderWebSite/';
   });
 });
 
-const { autoUpdater } = require('electron-updater');
-
-autoUpdater.autoDownload = false;
-autoUpdater.autoInstallOnAppQuit = true;
+let autoUpdater = null;
+try {
+  autoUpdater = require('electron-updater').autoUpdater;
+  if (autoUpdater) {
+    autoUpdater.autoDownload = false;
+    autoUpdater.autoInstallOnAppQuit = true;
+  }
+} catch (e) {
+  console.log('[AutoUpdater Load Safe Fallback]', e.message);
+}
 
 function setupAutoUpdater(win) {
-  autoUpdater.on('update-available', (info) => {
-    if (win && !win.isDestroyed()) {
-      win.webContents.send('app-update-available', {
-        version: info.version,
-        releaseNotes: info.releaseNotes || 'Nouvelle version disponible !',
-        downloadUrl: WEBSITE_URL
+  if (process.platform === 'win32' && autoUpdater) {
+    try {
+      autoUpdater.on('update-available', (info) => {
+        if (win && !win.isDestroyed()) {
+          win.webContents.send('app-update-available', {
+            version: info.version,
+            releaseNotes: info.releaseNotes || 'Nouvelle version disponible !',
+            downloadUrl: WEBSITE_URL
+          });
+        }
       });
-    }
-  });
 
-  autoUpdater.on('download-progress', (progressObj) => {
-    if (win && !win.isDestroyed()) {
-      win.webContents.send('app-update-progress', {
-        percent: progressObj.percent || 0,
-        bytesPerSecond: progressObj.bytesPerSecond || 0,
-        transferred: progressObj.transferred || 0,
-        total: progressObj.total || 0
+      autoUpdater.on('download-progress', (progressObj) => {
+        if (win && !win.isDestroyed()) {
+          win.webContents.send('app-update-progress', {
+            percent: progressObj.percent || 0,
+            bytesPerSecond: progressObj.bytesPerSecond || 0,
+            transferred: progressObj.transferred || 0,
+            total: progressObj.total || 0
+          });
+        }
       });
-    }
-  });
 
-  autoUpdater.on('update-downloaded', (info) => {
-    if (win && !win.isDestroyed()) {
-      win.webContents.send('app-update-downloaded', {
-        version: info.version
+      autoUpdater.on('update-downloaded', (info) => {
+        if (win && !win.isDestroyed()) {
+          win.webContents.send('app-update-downloaded', {
+            version: info.version
+          });
+        }
       });
-    }
-  });
 
-  autoUpdater.on('error', (err) => {
-    if (win && !win.isDestroyed()) {
-      win.webContents.send('app-update-error', err.message || err.toString());
-    }
-  });
-
-  if (app.isPackaged) {
-    autoUpdater.checkForUpdates().catch(() => {});
+      if (app.isPackaged) {
+        autoUpdater.checkForUpdates().catch(() => {});
+      }
+    } catch (e) {}
   }
 
   checkGitHubReleases(win);
