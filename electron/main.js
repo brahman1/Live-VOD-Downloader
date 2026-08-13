@@ -145,6 +145,11 @@ function createWindow() {
     autoHideMenuBar: true,
   });
 
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    require('electron').shell.openExternal(url);
+    return { action: 'deny' };
+  });
+
   if (isDev || process.env.VITE_DEV_SERVER_URL) {
     const devServerUrl = 'http://localhost:5173';
     mainWindow.loadURL(devServerUrl);
@@ -532,18 +537,14 @@ app.whenReady().then(async () => {
 const WEBSITE_URL = 'https://brahman1.github.io/DownloaderWebSite/';
 
   ipcMain.handle('start-app-update', async () => {
-    if (app.isPackaged && autoUpdater && process.platform === 'win32') {
-      try {
-        await autoUpdater.downloadUpdate();
-        return { success: true };
-      } catch (e) {
-        require('electron').shell.openExternal(WEBSITE_URL);
-        return { success: false, downloadUrl: WEBSITE_URL };
-      }
-    } else {
-      require('electron').shell.openExternal(WEBSITE_URL);
-      return { success: true, downloadUrl: WEBSITE_URL };
-    }
+    require('electron').shell.openExternal(WEBSITE_URL);
+    return { success: true, downloadUrl: WEBSITE_URL };
+  });
+
+  ipcMain.handle('open-external-url', async (_event, url) => {
+    const target = url || WEBSITE_URL;
+    require('electron').shell.openExternal(target);
+    return { success: true };
   });
 
   ipcMain.handle('install-app-update', () => {

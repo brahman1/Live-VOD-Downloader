@@ -333,9 +333,11 @@ export default function App() {
               ) : (
                 <button
                   onClick={async () => {
-                    const res = await (window.electronAPI as any)?.startAppUpdate?.();
-                    if (res && res.downloadUrl) {
-                      window.open(res.downloadUrl, '_blank');
+                    const api = window.electronAPI as any;
+                    if (api?.startAppUpdate) {
+                      await api.startAppUpdate();
+                    } else if (api?.openExternalUrl) {
+                      await api.openExternalUrl('https://brahman1.github.io/DownloaderWebSite/');
                     }
                   }}
                   className="px-4 py-1.5 bg-white text-cyan-900 hover:bg-cyan-50 font-black text-xs rounded-xl shadow-md transition-all cursor-pointer transform hover:scale-105"

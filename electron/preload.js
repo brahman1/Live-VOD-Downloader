@@ -31,5 +31,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onAppUpdateError: (callback) => ipcRenderer.on('app-update-error', (_event, data) => callback(data)),
   startAppUpdate: () => ipcRenderer.invoke('start-app-update'),
   installAppUpdate: () => ipcRenderer.invoke('install-app-update'),
-  checkAppUpdate: () => ipcRenderer.invoke('check-app-update')
+  checkAppUpdate: () => ipcRenderer.invoke('check-app-update'),
+  openExternalUrl: (url) => ipcRenderer.invoke('open-external-url', url)
 });
