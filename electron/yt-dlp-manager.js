@@ -23,8 +23,9 @@ class YtDlpManager {
     this.language = 'en'; // default
     this.tempDir = path.join(os.tmpdir(), 'livevault-temp');
     if (!fs.existsSync(this.tempDir)) {
-      fs.mkdirSync(this.tempDir, { recursive: true });
+      try { fs.mkdirSync(this.tempDir, { recursive: true }); } catch (e) {}
     }
+    this.ensureBinariesReady();
   }
 
   getBinName() {
@@ -33,8 +34,66 @@ class YtDlpManager {
     return 'yt-dlp'; // Linux
   }
 
+  ensureBinariesReady() {
+    const userDataBin = path.join(app.getPath('userData'), 'bin');
+    if (!fs.existsSync(userDataBin)) {
+      try { fs.mkdirSync(userDataBin, { recursive: true }); } catch (e) {}
+    }
+
+    const binName = this.getBinName();
+    const targetYtDlp = path.join(userDataBin, binName);
+    const targetFfmpeg = path.join(userDataBin, os.platform() === 'win32' ? 'ffmpeg.exe' : 'ffmpeg');
+    const targetFfprobe = path.join(userDataBin, os.platform() === 'win32' ? 'ffprobe.exe' : 'ffprobe');
+
+    // 1. Copy yt-dlp if not present
+    let packagedYtDlp = app.isPackaged 
+      ? path.join(process.resourcesPath, 'bin', binName)
+      : path.join(__dirname, '../bin', binName);
+
+    if (!fs.existsSync(targetYtDlp) && fs.existsSync(packagedYtDlp)) {
+      try { fs.copyFileSync(packagedYtDlp, targetYtDlp); } catch (e) {}
+    }
+
+    // 2. Copy ffmpeg if not present or size differs
+    try {
+      const srcFfmpeg = require('ffmpeg-static').replace('app.asar', 'app.asar.unpacked');
+      if (fs.existsSync(srcFfmpeg)) {
+        const srcSize = fs.statSync(srcFfmpeg).size;
+        const tgtSize = fs.existsSync(targetFfmpeg) ? fs.statSync(targetFfmpeg).size : 0;
+        if (srcSize !== tgtSize) {
+          fs.copyFileSync(srcFfmpeg, targetFfmpeg);
+        }
+      }
+    } catch (e) {}
+
+    // 3. Copy ffprobe if not present or size differs
+    try {
+      const srcFfprobe = require('ffprobe-static').path.replace('app.asar', 'app.asar.unpacked');
+      if (fs.existsSync(srcFfprobe)) {
+        const srcSize = fs.statSync(srcFfprobe).size;
+        const tgtSize = fs.existsSync(targetFfprobe) ? fs.statSync(targetFfprobe).size : 0;
+        if (srcSize !== tgtSize) {
+          fs.copyFileSync(srcFfprobe, targetFfprobe);
+        }
+      }
+    } catch (e) {}
+
+    // Fix permissions on Unix
+    if (os.platform() !== 'win32') {
+      [targetYtDlp, targetFfmpeg, targetFfprobe].forEach(p => {
+        try { if (fs.existsSync(p)) fs.chmodSync(p, '755'); } catch (e) {}
+      });
+    }
+
+    this.binDir = userDataBin;
+    return userDataBin;
+  }
+
   getYtDlpPath() {
     const binName = this.getBinName();
+    const userBinPath = path.join(app.getPath('userData'), 'bin', binName);
+    if (fs.existsSync(userBinPath)) return userBinPath;
+
     let binPath;
     if (app.isPackaged) {
       binPath = path.join(process.resourcesPath, 'bin', binName);
@@ -42,12 +101,33 @@ class YtDlpManager {
       binPath = path.join(__dirname, '../bin', binName);
     }
     
-    // Fix permissions issues on macOS/Linux
     if (os.platform() !== 'win32') {
       try { fs.chmodSync(binPath, '755'); } catch (e) {}
     }
-    
     return binPath;
+  }
+
+  getFfmpegDir() {
+    const userBinDir = path.join(app.getPath('userData'), 'bin');
+    const ffmpegInUserBin = path.join(userBinDir, os.platform() === 'win32' ? 'ffmpeg.exe' : 'ffmpeg');
+    if (fs.existsSync(ffmpegInUserBin)) {
+      return userBinDir;
+    }
+    try {
+      const srcFfmpeg = require('ffmpeg-static').replace('app.asar', 'app.asar.unpacked');
+      return path.dirname(srcFfmpeg);
+    } catch (e) {
+      return userBinDir;
+    }
+  }
+
+  getFfmpegBin() {
+    const userBinDir = path.join(app.getPath('userData'), 'bin');
+    const ffmpegInUserBin = path.join(userBinDir, os.platform() === 'win32' ? 'ffmpeg.exe' : 'ffmpeg');
+    if (fs.existsSync(ffmpegInUserBin)) {
+      return ffmpegInUserBin;
+    }
+    return require('ffmpeg-static').replace('app.asar', 'app.asar.unpacked');
   }
 
   sendToWindow(channel, payload) {
@@ -156,7 +236,7 @@ class YtDlpManager {
 
     let args = [
       url,
-      '--ffmpeg-location', ffmpegPath.replace('app.asar', 'app.asar.unpacked'),
+      '--ffmpeg-location', this.getFfmpegDir(),
       '--newline',
       '-c',
       '-P', `home:${workDir}`,
@@ -236,7 +316,7 @@ class YtDlpManager {
     }
 
     const ytDlpPath = this.getYtDlpPath();
-    const unpackedFfmpeg = ffmpegPath.replace('app.asar', 'app.asar.unpacked');
+    const unpackedFfmpeg = this.getFfmpegBin();
     
     if (os.platform() !== 'win32') {
       try { fs.chmodSync(unpackedFfmpeg, '755'); } catch(e) {}
@@ -606,7 +686,7 @@ class YtDlpManager {
       const fileList = parts.map(p => `file '${p.replace(/\\/g, '/').replace(/'/g, "'\\''")}'`).join('\n');
       fs.writeFileSync(concatFile, fileList);
 
-      const ffmpegBin = ffmpegPath.replace('app.asar', 'app.asar.unpacked');
+      const ffmpegBin = this.getFfmpegBin();
       
       if (os.platform() !== 'win32') {
         try { fs.chmodSync(ffmpegBin, '755'); } catch(e) {}
@@ -646,7 +726,7 @@ class YtDlpManager {
   }
   async _executeTikTokPhotoProcess(id, url, options, workDir, downloadsDir) {
       const ytDlpPath = this.getYtDlpPath();
-      const unpackedFfmpeg = ffmpegPath.replace('app.asar', 'app.asar.unpacked');
+      const unpackedFfmpeg = this.getFfmpegDir();
 
       const fileNameTemplate = options.relentlessMode ? `%(title).70s [%(id)s]-%(epoch)s.%(ext)s` : `%(title).70s [%(id)s].%(ext)s`;
 
@@ -818,7 +898,7 @@ class YtDlpManager {
           return;
       }
 
-      const ffmpegBin = ffmpegPath.replace('app.asar', 'app.asar.unpacked');
+      const ffmpegBin = this.getFfmpegBin();
       const finalDestName = path.basename(finalAudioDest).replace(path.extname(finalAudioDest), '_FINAL.mp4');
       const finalDest = path.join(realDownloadsDir, finalDestName);
       
@@ -953,7 +1033,7 @@ class YtDlpManager {
               return resolve({ success: false, error: 'Fichier source introuvable.' });
           }
 
-          const ffmpegBin = ffmpegPath.replace('app.asar', 'app.asar.unpacked');
+          const ffmpegBin = this.getFfmpegBin();
           if (os.platform() !== 'win32') {
               try { fs.chmodSync(ffmpegBin, '755'); } catch(e) {}
           }

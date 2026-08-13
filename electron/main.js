@@ -296,7 +296,15 @@ class PersistentQuotaManager {
   constructor() {
     let globalDir = '';
     if (process.platform === 'win32') {
-      globalDir = path.join(process.env.PROGRAMDATA || 'C:\\ProgramData', 'LiveAndVODDownloader');
+      const progData = process.env.PROGRAMDATA || 'C:\\ProgramData';
+      try {
+        const testDir = path.join(progData, 'LiveAndVODDownloader');
+        if (!fs.existsSync(testDir)) fs.mkdirSync(testDir, { recursive: true });
+        globalDir = testDir;
+      } catch (e) {
+        // Fallback to user appData if ProgramData is not writable (e.g. per-user install without admin)
+        globalDir = path.join(app.getPath('appData'), 'LiveAndVODDownloader');
+      }
     } else if (process.platform === 'darwin') {
       const home = process.env.HOME || require('os').homedir();
       globalDir = path.join(home, 'Library', 'Application Support', 'LiveAndVODDownloader');
