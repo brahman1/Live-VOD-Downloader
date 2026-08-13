@@ -531,18 +531,20 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('get-downloads-path', () => app.getPath('downloads'));
 
+const WEBSITE_URL = 'https://brahman1.github.io/DownloaderWebSite/';
+
   ipcMain.handle('start-app-update', async () => {
     if (app.isPackaged) {
       try {
         await autoUpdater.downloadUpdate();
         return { success: true };
       } catch (e) {
-        require('electron').shell.openExternal('https://github.com/brahman1/DownloaderWebSite/releases/latest');
-        return { success: false };
+        require('electron').shell.openExternal(WEBSITE_URL);
+        return { success: false, downloadUrl: WEBSITE_URL };
       }
     } else {
-      require('electron').shell.openExternal('https://github.com/brahman1/DownloaderWebSite/releases/latest');
-      return { success: true };
+      require('electron').shell.openExternal(WEBSITE_URL);
+      return { success: true, downloadUrl: WEBSITE_URL };
     }
   });
 
@@ -577,7 +579,8 @@ function setupAutoUpdater(win) {
     if (win && !win.isDestroyed()) {
       win.webContents.send('app-update-available', {
         version: info.version,
-        releaseNotes: info.releaseNotes || 'Nouvelle version disponible !'
+        releaseNotes: info.releaseNotes || 'Nouvelle version disponible !',
+        downloadUrl: WEBSITE_URL
       });
     }
   });
@@ -627,7 +630,7 @@ async function checkGitHubReleases(win) {
           win.webContents.send('app-update-available', {
             version: latestVersion,
             releaseNotes: data.body || 'Une nouvelle mise à jour est disponible sur le site !',
-            downloadUrl: 'https://github.com/brahman1/DownloaderWebSite/releases/latest'
+            downloadUrl: WEBSITE_URL
           });
         }
       }
