@@ -633,8 +633,28 @@ function setupAutoUpdater(win) {
   checkGitHubReleases(win, false);
 }
 
+let lastCheckTime = 0;
+const CHECK_COOLDOWN = 5 * 60 * 1000; // 5 minutes
+
 async function checkGitHubReleases(win, manual = false) {
   try {
+    const now = Date.now();
+    // Use cached latestAppUpdate if we checked recently
+    if (now - lastCheckTime < CHECK_COOLDOWN && latestAppUpdate) {
+      if (win && !win.isDestroyed()) {
+         win.webContents.send('app-update-available', latestAppUpdate);
+      }
+      return;
+    }
+    
+    // Also if we checked recently and there is no update, send not available
+    if (now - lastCheckTime < CHECK_COOLDOWN && manual) {
+      if (win && !win.isDestroyed()) {
+         win.webContents.send('app-update-not-available', { version: app.getVersion() });
+      }
+      return;
+    }
+
     const res = await fetch('https://api.github.com/repos/brahman1/DownloaderWebSite/releases/latest', {
       headers: {
         'User-Agent': 'Live-VOD-Downloader-App',
@@ -643,6 +663,7 @@ async function checkGitHubReleases(win, manual = false) {
     });
 
     if (res.ok) {
+      lastCheckTime = Date.now();
       const data = await res.json();
       const latestVersion = (data.tag_name || '').replace(/^[^\d]*/, '').trim();
       const currentVersion = app.getVersion();
@@ -661,6 +682,11 @@ async function checkGitHubReleases(win, manual = false) {
         if (win && !win.isDestroyed()) {
           win.webContents.send('app-update-not-available', { version: currentVersion });
         }
+      }
+    } else if (res.status === 403) {
+      // Rate limited by GitHub
+      if (manual && win && !win.isDestroyed()) {
+        win.webContents.send('app-update-not-available', { version: app.getVersion() });
       }
     } else if (manual) {
       if (win && !win.isDestroyed()) {
