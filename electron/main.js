@@ -631,26 +631,21 @@ function setupAutoUpdater(win) {
   }
 
   checkGitHubReleases(win, false);
-}
-
 let lastCheckTime = 0;
-const CHECK_COOLDOWN = 5 * 60 * 1000; // 5 minutes
+const AUTO_COOLDOWN = 5 * 60 * 1000; // 5 minutes for auto checks
+const MANUAL_COOLDOWN = 15 * 1000; // 15 seconds for manual checks
 
 async function checkGitHubReleases(win, manual = false) {
   try {
     const now = Date.now();
-    // Use cached latestAppUpdate if we checked recently
-    if (now - lastCheckTime < CHECK_COOLDOWN && latestAppUpdate) {
-      if (win && !win.isDestroyed()) {
-         win.webContents.send('app-update-available', latestAppUpdate);
-      }
-      return;
-    }
+    const cooldown = manual ? MANUAL_COOLDOWN : AUTO_COOLDOWN;
     
-    // Also if we checked recently and there is no update, send not available
-    if (now - lastCheckTime < CHECK_COOLDOWN && manual) {
-      if (win && !win.isDestroyed()) {
-         win.webContents.send('app-update-not-available', { version: app.getVersion() });
+    // If within cooldown
+    if (now - lastCheckTime < cooldown) {
+      if (latestAppUpdate) {
+        if (win && !win.isDestroyed()) win.webContents.send('app-update-available', latestAppUpdate);
+      } else if (manual) {
+        if (win && !win.isDestroyed()) win.webContents.send('app-update-not-available', { version: app.getVersion() });
       }
       return;
     }
@@ -686,7 +681,7 @@ async function checkGitHubReleases(win, manual = false) {
     } else if (res.status === 403) {
       // Rate limited by GitHub
       if (manual && win && !win.isDestroyed()) {
-        win.webContents.send('app-update-not-available', { version: app.getVersion() });
+        win.webContents.send('app-update-rate-limited');
       }
     } else if (manual) {
       if (win && !win.isDestroyed()) {

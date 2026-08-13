@@ -27,6 +27,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   fetchTwitchFollows: (cookiePath) => ipcRenderer.invoke('fetch-twitch-follows', cookiePath),
   onAppUpdateAvailable: (callback) => ipcRenderer.on('app-update-available', (_event, data) => callback(data)),
   onAppUpdateNotAvailable: (callback) => ipcRenderer.on('app-update-not-available', (_event, data) => callback(data)),
+  onAppUpdateRateLimited: (callback) => ipcRenderer.on('app-update-rate-limited', () => callback()),
   onAppUpdateProgress: (callback) => ipcRenderer.on('app-update-progress', (_event, data) => callback(data)),
   onAppUpdateDownloaded: (callback) => ipcRenderer.on('app-update-downloaded', (_event, data) => callback(data)),
   onAppUpdateError: (callback) => ipcRenderer.on('app-update-error', (_event, data) => callback(data)),

@@ -57,6 +57,7 @@ export default function App() {
   const [appUpdate, setAppUpdate] = useState<{
     available: boolean;
     notAvailable: boolean;
+    rateLimited: boolean;
     version: string;
     releaseNotes: string;
     downloadUrl?: string;
@@ -66,6 +67,7 @@ export default function App() {
   }>({
     available: false,
     notAvailable: false,
+    rateLimited: false,
     version: '',
     releaseNotes: '',
     downloading: false,
@@ -149,7 +151,17 @@ export default function App() {
         setAppUpdate(prev => ({
           ...prev,
           available: false,
+          rateLimited: false,
           notAvailable: true
+        }));
+      });
+
+      apiAny.onAppUpdateRateLimited?.(() => {
+        setAppUpdate(prev => ({
+          ...prev,
+          available: false,
+          notAvailable: false,
+          rateLimited: true
         }));
       });
 
