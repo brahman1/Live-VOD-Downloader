@@ -33,7 +33,7 @@ export default function Dashboard({ onStartDownload, t, onNavigateSitter, output
   const [metadata, setMetadata] = useState<VideoMetadata | null>(null);
   
   const [format, setFormat] = useState<DownloadOptions['format']>('optimized');
-  const [resolution, setResolution] = useState<'1080' | '720' | '480' | '360'>('1080');
+  const [resolution, setResolution] = useState<'1080' | '720' | '480' | '360'>(() => licenseStatus === 'FREE' ? '720' : '1080');
   const [cookieBrowser, setCookieBrowser] = useState<string>('none');
   const [cookieFilePath, setCookieFilePath] = useState<string>('');
   const useCookies = cookieBrowser !== 'none';
@@ -42,6 +42,12 @@ export default function Dashboard({ onStartDownload, t, onNavigateSitter, output
   const [autoCut, setAutoCut] = useState(false);
   const [isChecking, setIsChecking] = useState(false);
   const [checkError, setCheckError] = useState<string>('');
+
+  useEffect(() => {
+    if (licenseStatus === 'FREE' && resolution === '1080') {
+      setResolution('720');
+    }
+  }, [licenseStatus, resolution]);
 
   const formatBytes = (bytes?: number | null, decimals = 2) => {
     if (!bytes) return t('UNKNOWN_SIZE') || 'Inconnu';
@@ -273,16 +279,41 @@ export default function Dashboard({ onStartDownload, t, onNavigateSitter, output
 
                      {/* Right Panel Smart Addons or Resolution */}
                      <div className="bg-purple-50 border border-purple-100 rounded-xl p-4 flex flex-col gap-3 shadow-sm">
-                        {inferredType === 'video' && format !== 'audio' && (
-                           <div className="mb-2">
-                             <label className="text-sm text-purple-900 font-extrabold mb-2 block">{t('RESOLUTION')}</label>
-                             <div className="flex gap-2">
-                               {['1080', '720', '480', '360'].map(res => (
-                                 <button key={res} onClick={() => setResolution(res as any)} className={`flex-1 py-1 text-xs rounded-lg font-bold transition-all shadow-sm ${resolution === res ? 'bg-purple-600 text-white border border-purple-700 shadow-md shadow-purple-600/20' : 'bg-white text-slate-600 border border-slate-200 hover:border-slate-300 hover:bg-slate-50'}`}>{res}p</button>
-                               ))}
-                             </div>
-                           </div>
-                        )}
+                         {inferredType === 'video' && format !== 'audio' && (
+                            <div className="mb-2">
+                              <label className="text-sm text-purple-900 font-extrabold mb-2 block flex items-center justify-between">
+                                <span>{t('RESOLUTION')}</span>
+                                {licenseStatus === 'FREE' && (
+                                  <span className="text-[10px] text-purple-600 font-bold bg-purple-100 px-2 py-0.5 rounded-full">
+                                    720p Max (FREE)
+                                  </span>
+                                )}
+                              </label>
+                              <div className="flex gap-2">
+                                {['1080', '720', '480', '360'].map(res => {
+                                  const isDisabled = res === '1080' && licenseStatus === 'FREE';
+                                  return (
+                                    <button 
+                                      key={res} 
+                                      disabled={isDisabled}
+                                      onClick={() => !isDisabled && setResolution(res as any)} 
+                                      className={`flex-1 py-1.5 text-xs rounded-lg font-bold transition-all shadow-sm relative flex items-center justify-center gap-1 ${
+                                        isDisabled 
+                                          ? 'opacity-40 border-dashed border-slate-300 bg-slate-100 text-slate-400 cursor-not-allowed' 
+                                          : resolution === res 
+                                          ? 'bg-purple-600 text-white border border-purple-700 shadow-md shadow-purple-600/20 cursor-pointer' 
+                                          : 'bg-white text-slate-600 border border-slate-200 hover:border-slate-300 hover:bg-slate-50 cursor-pointer'
+                                      }`}
+                                      title={isDisabled ? '1080p réservé aux membres PRO / ELITE' : ''}
+                                    >
+                                      {res}p
+                                      {isDisabled && <span className="text-[9px] font-black text-purple-600 bg-purple-100 px-1 rounded">PRO</span>}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                         )}
 
                         <label className="flex items-center space-x-3 cursor-pointer group">
                           <input type="checkbox" className="hidden" checked={ghostMode} onChange={e => setGhostMode(e.target.checked)} />
