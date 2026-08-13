@@ -962,8 +962,18 @@ class YtDlpManager {
 
   getVideoMetadata(url, options = {}) {
       return new Promise((resolve) => {
+          let cleanUrl = url;
+          if (cleanUrl.includes('tiktok.com') && cleanUrl.includes('/photo/')) {
+              cleanUrl = cleanUrl.replace(/\/photo\//, '/video/');
+          }
           const ytDlpPath = this.getYtDlpPath();
-          const args = ['--dump-json', '--no-playlist', url];
+          const args = [
+              cleanUrl,
+              '--ffmpeg-location', this.getFfmpegDir(),
+              '--dump-json',
+              '--no-playlist',
+              '--user-agent', USER_AGENTS[0]
+          ];
           
           if (options.useCookies) {
               if (options.cookieBrowser === 'file' && options.cookieFilePath) {

@@ -74,13 +74,13 @@
     },
     "nsis": {
       "oneClick": false,
-      "perMachine": false,
+      "perMachine": true,
       "allowToChangeInstallationDirectory": true,
       "deleteAppDataOnUninstall": true
     }
   },
   "keywords": [],
-  "author": "Brahim",
+  "author": "Brahim <brahim-arab@outlook.fr>",
   "license": "ISC",
   "description": "Live & VOD Downloader",
   "dependencies": {
