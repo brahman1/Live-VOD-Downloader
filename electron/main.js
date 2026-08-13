@@ -531,17 +531,122 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('get-downloads-path', () => app.getPath('downloads'));
 
+  ipcMain.handle('start-app-update', async () => {
+    if (app.isPackaged) {
+      try {
+        await autoUpdater.downloadUpdate();
+        return { success: true };
+      } catch (e) {
+        require('electron').shell.openExternal('https://github.com/brahman1/DownloaderWebSite/releases/latest');
+        return { success: false };
+      }
+    } else {
+      require('electron').shell.openExternal('https://github.com/brahman1/DownloaderWebSite/releases/latest');
+      return { success: true };
+    }
+  });
+
+  ipcMain.handle('install-app-update', () => {
+    autoUpdater.quitAndInstall();
+  });
+
+  ipcMain.handle('check-app-update', async () => {
+    if (mainWindow) setupAutoUpdater(mainWindow);
+  });
+
   // CREATE WINDOW LAST SO Handlers are ready when React loads
   createWindow();
   
   // Now we can inject mainWindow into dlManager safely
   dlManager = new YtDlpManager(mainWindow, store, () => currentLicenseStatus);
   dlManager.checkForUpdates();
+  setupAutoUpdater(mainWindow);
 
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
 });
+
+const { autoUpdater } = require('electron-updater');
+
+autoUpdater.autoDownload = false;
+autoUpdater.autoInstallOnAppQuit = true;
+
+function setupAutoUpdater(win) {
+  autoUpdater.on('update-available', (info) => {
+    if (win && !win.isDestroyed()) {
+      win.webContents.send('app-update-available', {
+        version: info.version,
+        releaseNotes: info.releaseNotes || 'Nouvelle version disponible !'
+      });
+    }
+  });
+
+  autoUpdater.on('download-progress', (progressObj) => {
+    if (win && !win.isDestroyed()) {
+      win.webContents.send('app-update-progress', {
+        percent: progressObj.percent || 0,
+        bytesPerSecond: progressObj.bytesPerSecond || 0,
+        transferred: progressObj.transferred || 0,
+        total: progressObj.total || 0
+      });
+    }
+  });
+
+  autoUpdater.on('update-downloaded', (info) => {
+    if (win && !win.isDestroyed()) {
+      win.webContents.send('app-update-downloaded', {
+        version: info.version
+      });
+    }
+  });
+
+  autoUpdater.on('error', (err) => {
+    if (win && !win.isDestroyed()) {
+      win.webContents.send('app-update-error', err.message || err.toString());
+    }
+  });
+
+  if (app.isPackaged) {
+    autoUpdater.checkForUpdates().catch(() => {});
+  }
+
+  checkGitHubReleases(win);
+}
+
+async function checkGitHubReleases(win) {
+  try {
+    const res = await fetch('https://api.github.com/repos/brahman1/DownloaderWebSite/releases/latest');
+    if (res.ok) {
+      const data = await res.json();
+      const latestVersion = (data.tag_name || '').replace(/^[^\d]*/, '').trim();
+      const currentVersion = app.getVersion();
+      
+      if (latestVersion && isNewerVersion(latestVersion, currentVersion)) {
+        if (win && !win.isDestroyed()) {
+          win.webContents.send('app-update-available', {
+            version: latestVersion,
+            releaseNotes: data.body || 'Une nouvelle mise à jour est disponible sur le site !',
+            downloadUrl: 'https://github.com/brahman1/DownloaderWebSite/releases/latest'
+          });
+        }
+      }
+    }
+  } catch (e) {}
+}
+
+function isNewerVersion(latest, current) {
+  const parse = v => v.split('.').map(n => parseInt(n, 10) || 0);
+  const l = parse(latest);
+  const c = parse(current);
+  for (let i = 0; i < Math.max(l.length, c.length); i++) {
+    const lNum = l[i] || 0;
+    const cNum = c[i] || 0;
+    if (lNum > cNum) return true;
+    if (lNum < cNum) return false;
+  }
+  return false;
+}
 
 app.on('window-all-closed', function () {
   if (process.platform !== 'darwin') app.quit();

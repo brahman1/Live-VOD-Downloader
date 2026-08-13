@@ -54,6 +54,23 @@ export default function App() {
   const [outputFolder, setOutputFolder] = useState<string>(() => localStorage.getItem('customOutputFolder') || '');
   const [defaultFolder, setDefaultFolder] = useState<string>('');
 
+  const [appUpdate, setAppUpdate] = useState<{
+    available: boolean;
+    version: string;
+    releaseNotes: string;
+    downloadUrl?: string;
+    downloading: boolean;
+    percent: number;
+    downloaded: boolean;
+  }>({
+    available: false,
+    version: '',
+    releaseNotes: '',
+    downloading: false,
+    percent: 0,
+    downloaded: false
+  });
+
   const t: Translator = (key) => locales[language][key] || key;
 
   useEffect(() => {
@@ -113,6 +130,33 @@ export default function App() {
 
       window.electronAPI.onLog((logData) => {
         setLogs(prev => [...prev.slice(-199), logData]);
+      });
+
+      apiAny.onAppUpdateAvailable?.((data: any) => {
+        setAppUpdate(prev => ({
+          ...prev,
+          available: true,
+          version: data.version,
+          releaseNotes: data.releaseNotes || '',
+          downloadUrl: data.downloadUrl
+        }));
+      });
+
+      apiAny.onAppUpdateProgress?.((data: any) => {
+        setAppUpdate(prev => ({
+          ...prev,
+          downloading: true,
+          percent: Math.round(data.percent || 0)
+        }));
+      });
+
+      apiAny.onAppUpdateDownloaded?.((data: any) => {
+        setAppUpdate(prev => ({
+          ...prev,
+          downloading: false,
+          downloaded: true,
+          version: data.version
+        }));
       });
     }
   }, []);
@@ -245,6 +289,63 @@ export default function App() {
 
       {/* Main Content */}
       <main className="flex-1 relative flex flex-col h-full overflow-hidden">
+        {/* Automatic App Update Banner */}
+        {appUpdate.available && (
+          <div className="bg-gradient-to-r from-cyan-600 to-blue-600 text-white px-6 py-3 shadow-lg flex items-center justify-between z-30 border-b border-cyan-400/30 shrink-0">
+            <div className="flex items-center gap-3">
+              <span className="text-xl animate-bounce">🚀</span>
+              <div>
+                <div className="font-extrabold text-sm">
+                  {language === 'fr' 
+                    ? `Mise à jour disponible : v${appUpdate.version}` 
+                    : `Update Available: v${appUpdate.version}`}
+                </div>
+                <div className="text-xs opacity-90">
+                  {appUpdate.downloaded 
+                    ? (language === 'fr' ? 'La mise à jour est prête à être installée !' : 'The update is ready to install!')
+                    : appUpdate.downloading 
+                    ? (language === 'fr' ? `Téléchargement en cours... ${appUpdate.percent}%` : `Downloading update... ${appUpdate.percent}%`)
+                    : (language === 'fr' ? 'Cliquez sur mettre à jour pour installer la nouvelle version.' : 'Click update to install the latest version.')}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {appUpdate.downloaded ? (
+                <button
+                  onClick={() => (window.electronAPI as any)?.installAppUpdate?.()}
+                  className="px-4 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white font-black text-xs rounded-xl shadow-md transition-all cursor-pointer transform hover:scale-105"
+                >
+                  {language === 'fr' ? 'Redémarrer & Installer' : 'Restart & Install'}
+                </button>
+              ) : appUpdate.downloading ? (
+                <div className="w-32 bg-cyan-950/50 rounded-full h-3 overflow-hidden border border-cyan-300/40">
+                  <div className="bg-emerald-400 h-full transition-all duration-300" style={{ width: `${appUpdate.percent}%` }}></div>
+                </div>
+              ) : (
+                <button
+                  onClick={async () => {
+                    const res = await (window.electronAPI as any)?.startAppUpdate?.();
+                    if (res && res.downloadUrl) {
+                      window.open(res.downloadUrl, '_blank');
+                    }
+                  }}
+                  className="px-4 py-1.5 bg-white text-cyan-900 hover:bg-cyan-50 font-black text-xs rounded-xl shadow-md transition-all cursor-pointer transform hover:scale-105"
+                >
+                  {language === 'fr' ? 'Mettre à jour' : 'Update Now'}
+                </button>
+              )}
+
+              <button
+                onClick={() => setAppUpdate(prev => ({ ...prev, available: false }))}
+                className="px-2 py-1 text-xs opacity-75 hover:opacity-100 text-white cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Dynamic Background Effects */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none -z-10">
           <div className="absolute top-[-20%] right-[10%] w-[50%] h-[50%] bg-purple-600/10 rounded-full blur-[140px] mix-blend-screen"></div>
