@@ -56,6 +56,7 @@ export default function App() {
 
   const [appUpdate, setAppUpdate] = useState<{
     available: boolean;
+    notAvailable: boolean;
     version: string;
     releaseNotes: string;
     downloadUrl?: string;
@@ -64,6 +65,7 @@ export default function App() {
     downloaded: boolean;
   }>({
     available: false,
+    notAvailable: false,
     version: '',
     releaseNotes: '',
     downloading: false,
@@ -136,9 +138,18 @@ export default function App() {
         setAppUpdate(prev => ({
           ...prev,
           available: true,
+          notAvailable: false,
           version: data.version,
           releaseNotes: data.releaseNotes || '',
           downloadUrl: data.downloadUrl
+        }));
+      });
+
+      apiAny.onAppUpdateNotAvailable?.(() => {
+        setAppUpdate(prev => ({
+          ...prev,
+          available: false,
+          notAvailable: true
         }));
       });
 
@@ -159,7 +170,7 @@ export default function App() {
         }));
       });
 
-      apiAny.checkAppUpdate?.();
+      apiAny.checkAppUpdate?.(false);
     }
   }, []);
 
@@ -401,7 +412,7 @@ export default function App() {
           <div className={activeTab === 'socialhub' ? '' : 'hidden'}>
             <SocialHub onStartDownload={handleStartDownload} t={t} />
           </div>
-          {activeTab === 'settings' && <Settings language={language} setLanguage={setLanguage} t={t} outputFolder={outputFolder} setOutputFolder={setOutputFolder} defaultFolder={defaultFolder} />}
+          {activeTab === 'settings' && <Settings language={language} setLanguage={setLanguage} t={t} outputFolder={outputFolder} setOutputFolder={setOutputFolder} defaultFolder={defaultFolder} appUpdate={appUpdate} setAppUpdate={setAppUpdate} />}
         </div>
       </main>
 

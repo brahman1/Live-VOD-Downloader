@@ -555,12 +555,14 @@ const WEBSITE_URL = 'https://brahman1.github.io/DownloaderWebSite/';
     }
   });
 
-  ipcMain.handle('check-app-update', async () => {
+  ipcMain.handle('check-app-update', async (_event, manual) => {
     if (mainWindow && !mainWindow.isDestroyed()) {
-      if (latestAppUpdate) {
+      // If manual check, always re-fetch to see if a new release was just published
+      if (!manual && latestAppUpdate) {
         mainWindow.webContents.send('app-update-available', latestAppUpdate);
+      } else {
+        checkGitHubReleases(mainWindow, manual);
       }
-      checkGitHubReleases(mainWindow);
     }
   });
 
@@ -628,10 +630,10 @@ function setupAutoUpdater(win) {
     } catch (e) {}
   }
 
-  checkGitHubReleases(win);
+  checkGitHubReleases(win, false);
 }
 
-async function checkGitHubReleases(win) {
+async function checkGitHubReleases(win, manual = false) {
   try {
     const res = await fetch('https://api.github.com/repos/brahman1/DownloaderWebSite/releases/latest', {
       headers: {
@@ -655,10 +657,21 @@ async function checkGitHubReleases(win) {
         if (win && !win.isDestroyed()) {
           win.webContents.send('app-update-available', latestAppUpdate);
         }
+      } else if (manual) {
+        if (win && !win.isDestroyed()) {
+          win.webContents.send('app-update-not-available', { version: currentVersion });
+        }
+      }
+    } else if (manual) {
+      if (win && !win.isDestroyed()) {
+        win.webContents.send('app-update-not-available', { version: app.getVersion() });
       }
     }
   } catch (e) {
     console.log('[CheckGitHubReleases Error]', e.message);
+    if (manual && win && !win.isDestroyed()) {
+      win.webContents.send('app-update-not-available', { version: app.getVersion() });
+    }
   }
 }
 

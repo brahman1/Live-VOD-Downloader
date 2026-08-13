@@ -8,9 +8,11 @@ interface SettingsProps {
   outputFolder: string;
   setOutputFolder: (folder: string) => void;
   defaultFolder: string;
+  appUpdate?: any;
+  setAppUpdate?: any;
 }
 
-export default function Settings({ language, setLanguage, t, outputFolder, setOutputFolder, defaultFolder }: SettingsProps) {
+export default function Settings({ language, setLanguage, t, outputFolder, setOutputFolder, defaultFolder, appUpdate, setAppUpdate }: SettingsProps) {
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500 pb-20">
       
@@ -145,10 +147,20 @@ export default function Settings({ language, setLanguage, t, outputFolder, setOu
             <div className="text-xs text-slate-500 font-medium">Version 1.2.0 (Build 64-bit)</div>
           </div>
           <button 
-            onClick={() => (window.electronAPI as any)?.checkAppUpdate?.()}
-            className="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-xl text-xs font-bold shadow-md shadow-cyan-600/20 transition-all cursor-pointer"
+            onClick={() => {
+              if (setAppUpdate) {
+                 setAppUpdate((prev: any) => ({ ...prev, notAvailable: false }));
+              }
+              (window.electronAPI as any)?.checkAppUpdate?.(true);
+            }}
+            disabled={appUpdate?.notAvailable}
+            className={`px-4 py-2 rounded-xl text-xs font-bold shadow-md transition-all cursor-pointer ${
+              appUpdate?.notAvailable 
+                ? 'bg-emerald-500 text-white shadow-emerald-500/20 cursor-default'
+                : 'bg-cyan-600 hover:bg-cyan-700 text-white shadow-cyan-600/20'
+            }`}
           >
-            Vérifier les mises à jour
+            {appUpdate?.notAvailable ? 'À jour ✅' : 'Vérifier les mises à jour'}
           </button>
         </div>
       </div>

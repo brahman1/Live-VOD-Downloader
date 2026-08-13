@@ -26,11 +26,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveOutputFolder: (folder) => ipcRenderer.send('save-output-folder', folder),
   fetchTwitchFollows: (cookiePath) => ipcRenderer.invoke('fetch-twitch-follows', cookiePath),
   onAppUpdateAvailable: (callback) => ipcRenderer.on('app-update-available', (_event, data) => callback(data)),
+  onAppUpdateNotAvailable: (callback) => ipcRenderer.on('app-update-not-available', (_event, data) => callback(data)),
   onAppUpdateProgress: (callback) => ipcRenderer.on('app-update-progress', (_event, data) => callback(data)),
   onAppUpdateDownloaded: (callback) => ipcRenderer.on('app-update-downloaded', (_event, data) => callback(data)),
   onAppUpdateError: (callback) => ipcRenderer.on('app-update-error', (_event, data) => callback(data)),
   startAppUpdate: () => ipcRenderer.invoke('start-app-update'),
   installAppUpdate: () => ipcRenderer.invoke('install-app-update'),
-  checkAppUpdate: () => ipcRenderer.invoke('check-app-update'),
+  checkAppUpdate: (manual) => ipcRenderer.invoke('check-app-update', manual),
   openExternalUrl: (url) => ipcRenderer.invoke('open-external-url', url)
 });
