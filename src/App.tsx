@@ -210,11 +210,16 @@ export default function App() {
       
       {/* Sidebar */}
       <aside className="w-64 bg-white border-r border-slate-200 flex flex-col z-10 shrink-0 shadow-sm">
-         <div className="p-5">
-            <h1 className="text-xl font-black bg-clip-text text-transparent bg-gradient-to-r from-cyan-600 via-indigo-600 to-purple-600 mb-1 leading-tight tracking-tighter">
-              Live & VOD <br/>
-              <span className="text-lg">Downloader</span>
-            </h1>
+         <div className="p-5 flex items-start justify-between">
+            <div>
+              <h1 className="text-xl font-black bg-clip-text text-transparent bg-gradient-to-r from-cyan-600 via-indigo-600 to-purple-600 leading-tight tracking-tighter">
+                Live & VOD <br/>
+                <span className="text-lg">Downloader</span>
+              </h1>
+            </div>
+            <span className="text-[10px] font-black text-cyan-700 bg-cyan-50 border border-cyan-200 px-2 py-0.5 rounded-full shadow-xs mt-0.5">
+              v1.2.0
+            </span>
          </div>
 
          <nav className="flex-1 px-3 space-y-1.5 mt-2 text-sm font-semibold overflow-y-auto hide-scrollbar">
@@ -275,13 +280,16 @@ export default function App() {
               </button>
             )}
             
-            <div className="text-center pt-0.5">
+            <div className="text-center pt-0.5 space-y-1">
                <div 
                  onClick={() => licenseStatus === 'FREE' && setShowLicenseModal(true)}
                  className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full inline-block ${licenseStatus === 'FREE' ? 'bg-slate-200 text-slate-700 cursor-pointer hover:bg-slate-300' : licenseStatus === 'ELITE' ? 'bg-purple-100 text-purple-700 border border-purple-200' : 'bg-cyan-100 text-cyan-800 border border-cyan-200'}`}
                >
                  {t(`VERSION_${licenseStatus}` as keyof typeof locales.en)}
                  {licenseStatus === 'FREE' && ` (${quota.remainingDownloads}/10 restants)`}
+               </div>
+               <div className="text-[10px] text-slate-400 font-bold tracking-tight">
+                 Live & VOD Downloader v1.2.0
                </div>
             </div>
          </div>

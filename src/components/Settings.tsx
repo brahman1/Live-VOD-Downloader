@@ -128,6 +128,31 @@ export default function Settings({ language, setLanguage, t, outputFolder, setOu
         </div>
       </div>
 
+      {/* App Version & Updates */}
+      <div className="bg-white border border-slate-200/90 p-6 rounded-2xl shadow-sm">
+        <div className="flex items-start gap-4 mb-4">
+          <div className="p-3 bg-cyan-50 rounded-xl border border-cyan-100">
+            <Server className="w-6 h-6 text-cyan-600" />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-lg font-bold text-slate-900">À propos de l'application</h3>
+            <p className="text-sm text-slate-500 font-medium">Version actuelle de Live & VOD Downloader</p>
+          </div>
+        </div>
+        <div className="flex items-center justify-between bg-slate-50 p-4 rounded-xl border border-slate-200">
+          <div>
+            <div className="text-sm font-extrabold text-slate-900">Live & VOD Downloader</div>
+            <div className="text-xs text-slate-500 font-medium">Version 1.2.0 (Build 64-bit)</div>
+          </div>
+          <button 
+            onClick={() => (window.electronAPI as any)?.checkAppUpdate?.()}
+            className="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-xl text-xs font-bold shadow-md shadow-cyan-600/20 transition-all cursor-pointer"
+          >
+            Vérifier les mises à jour
+          </button>
+        </div>
+      </div>
+
     </div>
   );
 }
