@@ -536,9 +536,77 @@ app.whenReady().then(async () => {
 
 const WEBSITE_URL = 'https://brahman1.github.io/DownloaderWebSite/';
 
+  const os = require('os');
+  const https = require('https');
+  const { spawn } = require('child_process');
+
+  let updateFilePath = null;
+
   ipcMain.handle('start-app-update', async () => {
-    require('electron').shell.openExternal(WEBSITE_URL);
-    return { success: true, downloadUrl: WEBSITE_URL };
+    if (!latestAppUpdate || !latestAppUpdate.downloadUrl) {
+       require('electron').shell.openExternal(WEBSITE_URL);
+       return { success: true };
+    }
+    
+    if (!latestAppUpdate.isDirectDownload) {
+       require('electron').shell.openExternal(latestAppUpdate.downloadUrl);
+       return { success: true };
+    }
+
+    const downloadUrl = latestAppUpdate.downloadUrl;
+    const fileName = path.basename(new URL(downloadUrl).pathname) || 'update_file';
+    updateFilePath = path.join(os.tmpdir(), fileName);
+
+    if (fs.existsSync(updateFilePath)) {
+       try { fs.unlinkSync(updateFilePath); } catch (e) {}
+    }
+
+    const fileStream = fs.createWriteStream(updateFilePath);
+    
+    const downloadFile = (url) => {
+      https.get(url, (response) => {
+        if (response.statusCode === 301 || response.statusCode === 302) {
+          downloadFile(response.headers.location);
+          return;
+        }
+        
+        if (response.statusCode !== 200) {
+           if (mainWindow && !mainWindow.isDestroyed()) {
+               mainWindow.webContents.send('app-update-error', 'Server returned ' + response.statusCode);
+           }
+           return;
+        }
+
+        const totalBytes = parseInt(response.headers['content-length'], 10) || 0;
+        let downloadedBytes = 0;
+
+        response.on('data', (chunk) => {
+          downloadedBytes += chunk.length;
+          const percent = totalBytes ? (downloadedBytes / totalBytes) * 100 : 0;
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('app-update-progress', { percent });
+          }
+        });
+
+        response.pipe(fileStream);
+
+        fileStream.on('finish', () => {
+          fileStream.close();
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('app-update-progress', { percent: 100 });
+            mainWindow.webContents.send('app-update-downloaded', { version: latestAppUpdate.version });
+          }
+        });
+      }).on('error', (err) => {
+         fs.unlink(updateFilePath, () => {});
+         if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('app-update-error', err.message);
+         }
+      });
+    };
+
+    downloadFile(downloadUrl);
+    return { success: true };
   });
 
   ipcMain.handle('open-external-url', async (_event, url) => {
@@ -548,16 +616,30 @@ const WEBSITE_URL = 'https://brahman1.github.io/DownloaderWebSite/';
   });
 
   ipcMain.handle('install-app-update', () => {
-    if (autoUpdater) {
+    if (updateFilePath && fs.existsSync(updateFilePath)) {
+      const ext = path.extname(updateFilePath).toLowerCase();
       try {
-        autoUpdater.quitAndInstall();
-      } catch (e) {}
+        if (os.platform() === 'win32' && ext === '.exe') {
+          const child = spawn(updateFilePath, [], {
+             detached: true,
+             stdio: 'ignore'
+          });
+          child.unref();
+          app.quit();
+        } else {
+          require('electron').shell.showItemInFolder(updateFilePath);
+          app.quit();
+        }
+      } catch (e) {
+         console.error('Failed to install update', e);
+      }
+    } else {
+      require('electron').shell.openExternal(WEBSITE_URL);
     }
   });
 
   ipcMain.handle('check-app-update', async (_event, manual) => {
     if (mainWindow && !mainWindow.isDestroyed()) {
-      // If manual check, always re-fetch to see if a new release was just published
       if (!manual && latestAppUpdate) {
         mainWindow.webContents.send('app-update-available', latestAppUpdate);
       } else {
@@ -566,10 +648,8 @@ const WEBSITE_URL = 'https://brahman1.github.io/DownloaderWebSite/';
     }
   });
 
-  // CREATE WINDOW LAST SO Handlers are ready when React loads
   createWindow();
   
-  // Now we can inject mainWindow into dlManager safely
   dlManager = new YtDlpManager(mainWindow, store, () => currentLicenseStatus);
   dlManager.checkForUpdates();
   setupAutoUpdater(mainWindow);
@@ -579,68 +659,21 @@ const WEBSITE_URL = 'https://brahman1.github.io/DownloaderWebSite/';
   });
 });
 
-let autoUpdater = null;
-try {
-  autoUpdater = require('electron-updater').autoUpdater;
-  if (autoUpdater) {
-    autoUpdater.autoDownload = false;
-    autoUpdater.autoInstallOnAppQuit = true;
-  }
-} catch (e) {
-  console.log('[AutoUpdater Load Safe Fallback]', e.message);
-}
-
 let latestAppUpdate = null;
 
 function setupAutoUpdater(win) {
-  if (process.platform === 'win32' && autoUpdater) {
-    try {
-      autoUpdater.on('update-available', (info) => {
-        if (win && !win.isDestroyed()) {
-          win.webContents.send('app-update-available', {
-            version: info.version,
-            releaseNotes: info.releaseNotes || 'Nouvelle version disponible !',
-            downloadUrl: WEBSITE_URL
-          });
-        }
-      });
-
-      autoUpdater.on('download-progress', (progressObj) => {
-        if (win && !win.isDestroyed()) {
-          win.webContents.send('app-update-progress', {
-            percent: progressObj.percent || 0,
-            bytesPerSecond: progressObj.bytesPerSecond || 0,
-            transferred: progressObj.transferred || 0,
-            total: progressObj.total || 0
-          });
-        }
-      });
-
-      autoUpdater.on('update-downloaded', (info) => {
-        if (win && !win.isDestroyed()) {
-          win.webContents.send('app-update-downloaded', {
-            version: info.version
-          });
-        }
-      });
-
-      if (app.isPackaged) {
-        autoUpdater.checkForUpdates().catch(() => {});
-      }
-    } catch (e) {}
-  }
-
   checkGitHubReleases(win, false);
+}
+
 let lastCheckTime = 0;
-const AUTO_COOLDOWN = 5 * 60 * 1000; // 5 minutes for auto checks
-const MANUAL_COOLDOWN = 15 * 1000; // 15 seconds for manual checks
+const AUTO_COOLDOWN = 5 * 60 * 1000;
+const MANUAL_COOLDOWN = 15 * 1000;
 
 async function checkGitHubReleases(win, manual = false) {
   try {
     const now = Date.now();
     const cooldown = manual ? MANUAL_COOLDOWN : AUTO_COOLDOWN;
     
-    // If within cooldown
     if (now - lastCheckTime < cooldown) {
       if (latestAppUpdate) {
         if (win && !win.isDestroyed()) win.webContents.send('app-update-available', latestAppUpdate);
@@ -664,10 +697,41 @@ async function checkGitHubReleases(win, manual = false) {
       const currentVersion = app.getVersion();
       
       if (latestVersion && isNewerVersion(latestVersion, currentVersion)) {
+        const platform = os.platform();
+        const arch = os.arch();
+        let targetExt = '.zip';
+        let archKeywords = [];
+
+        if (platform === 'win32') {
+          targetExt = '.exe';
+        } else if (platform === 'darwin') {
+          targetExt = '.dmg';
+          archKeywords = arch === 'arm64' ? ['arm64', 'aarch64', 'm1'] : ['x64', 'intel', 'mac'];
+        } else if (platform === 'linux') {
+          targetExt = '.zip';
+        }
+
+        let bestAsset = null;
+        if (data.assets && data.assets.length > 0) {
+          const extAssets = data.assets.filter(a => a.name.toLowerCase().endsWith(targetExt));
+          if (extAssets.length > 0) {
+             if (platform === 'darwin' && extAssets.length > 1) {
+                bestAsset = extAssets.find(a => archKeywords.some(kw => a.name.toLowerCase().includes(kw))) || extAssets[0];
+             } else {
+                bestAsset = extAssets[0];
+             }
+          } else {
+             bestAsset = data.assets[0];
+          }
+        }
+
+        const downloadUrl = bestAsset ? bestAsset.browser_download_url : WEBSITE_URL;
+        
         latestAppUpdate = {
           version: latestVersion,
-          releaseNotes: data.body || 'Une nouvelle mise à jour est disponible sur le site !',
-          downloadUrl: WEBSITE_URL
+          releaseNotes: data.body || 'Une nouvelle mise à jour est disponible !',
+          downloadUrl: downloadUrl,
+          isDirectDownload: bestAsset != null
         };
 
         if (win && !win.isDestroyed()) {
@@ -679,7 +743,6 @@ async function checkGitHubReleases(win, manual = false) {
         }
       }
     } else if (res.status === 403) {
-      // Rate limited by GitHub
       if (manual && win && !win.isDestroyed()) {
         win.webContents.send('app-update-rate-limited');
       }
@@ -689,7 +752,6 @@ async function checkGitHubReleases(win, manual = false) {
       }
     }
   } catch (e) {
-    console.log('[CheckGitHubReleases Error]', e.message);
     if (manual && win && !win.isDestroyed()) {
       win.webContents.send('app-update-not-available', { version: app.getVersion() });
     }
