@@ -10,9 +10,10 @@ interface SettingsProps {
   defaultFolder: string;
   appUpdate?: any;
   setAppUpdate?: any;
+  updaterLogs?: string[];
 }
 
-export default function Settings({ language, setLanguage, t, outputFolder, setOutputFolder, defaultFolder, appUpdate, setAppUpdate }: SettingsProps) {
+export default function Settings({ language, setLanguage, t, outputFolder, setOutputFolder, defaultFolder, appUpdate, setAppUpdate, updaterLogs = [] }: SettingsProps) {
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500 pb-20">
       
@@ -171,6 +172,18 @@ export default function Settings({ language, setLanguage, t, outputFolder, setOu
             {appUpdate?.rateLimited ? 'Trop de requêtes ⏱️' : appUpdate?.notAvailable ? 'À jour ✅' : 'Vérifier les mises à jour'}
           </button>
         </div>
+        
+        {/* Debug Logs */}
+        {updaterLogs && updaterLogs.length > 0 && (
+          <div className="mt-4 bg-slate-900 rounded-xl p-3 max-h-40 overflow-y-auto">
+            <div className="text-[10px] text-slate-400 font-mono mb-2 uppercase tracking-wider">Logs de mise à jour</div>
+            <div className="space-y-1">
+              {updaterLogs.map((log, i) => (
+                <div key={i} className="text-[11px] text-emerald-400 font-mono leading-relaxed">{log}</div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
     </div>

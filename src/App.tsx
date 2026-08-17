@@ -136,6 +136,10 @@ export default function App() {
         setLogs(prev => [...prev.slice(-199), logData]);
       });
 
+      apiAny.onAppUpdateLog?.((msg: string) => {
+        setUpdaterLogs(prev => [...prev, msg]);
+      });
+
       apiAny.onAppUpdateAvailable?.((data: any) => {
         setAppUpdate(prev => ({
           ...prev,
@@ -424,7 +428,7 @@ export default function App() {
           <div className={activeTab === 'socialhub' ? '' : 'hidden'}>
             <SocialHub onStartDownload={handleStartDownload} t={t} />
           </div>
-          {activeTab === 'settings' && <Settings language={language} setLanguage={setLanguage} t={t} outputFolder={outputFolder} setOutputFolder={setOutputFolder} defaultFolder={defaultFolder} appUpdate={appUpdate} setAppUpdate={setAppUpdate} />}
+          {activeTab === 'settings' && <Settings language={language} setLanguage={setLanguage} t={t} outputFolder={outputFolder} setOutputFolder={setOutputFolder} defaultFolder={defaultFolder} appUpdate={appUpdate} setAppUpdate={setAppUpdate} updaterLogs={updaterLogs} />}
         </div>
       </main>
 

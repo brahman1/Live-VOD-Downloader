@@ -669,12 +669,21 @@ let lastCheckTime = 0;
 const AUTO_COOLDOWN = 5 * 60 * 1000;
 const MANUAL_COOLDOWN = 15 * 1000;
 
+function sendLog(win, msg) {
+  console.log('[Updater]', msg);
+  if (win && !win.isDestroyed()) {
+    win.webContents.send('app-update-log', msg);
+  }
+}
+
 async function checkGitHubReleases(win, manual = false) {
   try {
+    sendLog(win, 'Démarrage de la vérification de mise à jour. Manual: ' + manual);
     const now = Date.now();
     const cooldown = manual ? MANUAL_COOLDOWN : AUTO_COOLDOWN;
     
     if (now - lastCheckTime < cooldown) {
+      sendLog(win, 'Vérification annulée : Le cooldown n\'est pas écoulé. Temps restant: ' + Math.round((cooldown - (now - lastCheckTime))/1000) + 's');
       if (latestAppUpdate) {
         if (win && !win.isDestroyed()) win.webContents.send('app-update-available', latestAppUpdate);
       } else if (manual) {
@@ -683,6 +692,7 @@ async function checkGitHubReleases(win, manual = false) {
       return;
     }
 
+    sendLog(win, 'Requête vers l\'API GitHub: https://api.github.com/repos/brahman1/DownloaderWebSite/releases/latest');
     const res = await fetch('https://api.github.com/repos/brahman1/DownloaderWebSite/releases/latest', {
       headers: {
         'User-Agent': 'Live-VOD-Downloader-App',
@@ -696,7 +706,10 @@ async function checkGitHubReleases(win, manual = false) {
       const latestVersion = (data.tag_name || '').replace(/^[^\d]*/, '').trim();
       const currentVersion = app.getVersion();
       
+      sendLog(win, `Réponse OK. Version distante: ${latestVersion} | Version locale: ${currentVersion}`);
+      
       if (latestVersion && isNewerVersion(latestVersion, currentVersion)) {
+        sendLog(win, 'Une mise à jour plus récente a été détectée.');
         const platform = os.platform();
         const arch = os.arch();
         let targetExt = '.zip';
@@ -726,6 +739,7 @@ async function checkGitHubReleases(win, manual = false) {
         }
 
         const downloadUrl = bestAsset ? bestAsset.browser_download_url : WEBSITE_URL;
+        sendLog(win, `Asset sélectionné: ${bestAsset ? bestAsset.name : 'Aucun asset compatible trouvé, fallback site web'}`);
         
         latestAppUpdate = {
           version: latestVersion,
@@ -737,21 +751,25 @@ async function checkGitHubReleases(win, manual = false) {
         if (win && !win.isDestroyed()) {
           win.webContents.send('app-update-available', latestAppUpdate);
         }
-      } else if (manual) {
-        if (win && !win.isDestroyed()) {
+      } else {
+        sendLog(win, 'La version locale est identique ou supérieure à la version distante.');
+        if (manual && win && !win.isDestroyed()) {
           win.webContents.send('app-update-not-available', { version: currentVersion });
         }
       }
     } else if (res.status === 403) {
+      sendLog(win, 'Erreur 403: Rate Limited par GitHub.');
       if (manual && win && !win.isDestroyed()) {
         win.webContents.send('app-update-rate-limited');
       }
-    } else if (manual) {
-      if (win && !win.isDestroyed()) {
+    } else {
+      sendLog(win, `Erreur réseau: Statut HTTP ${res.status}`);
+      if (manual && win && !win.isDestroyed()) {
         win.webContents.send('app-update-not-available', { version: app.getVersion() });
       }
     }
   } catch (e) {
+    sendLog(win, `Erreur inattendue: ${e.message}`);
     if (manual && win && !win.isDestroyed()) {
       win.webContents.send('app-update-not-available', { version: app.getVersion() });
     }
