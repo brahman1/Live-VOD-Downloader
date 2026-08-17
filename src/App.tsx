@@ -75,11 +75,19 @@ export default function App() {
     downloaded: false
   });
   const [updaterLogs, setUpdaterLogs] = useState<string[]>([]);
+  const [appVersion, setAppVersion] = useState<string>('1.2.0');
 
   const t: Translator = (key) => locales[language][key] || key;
 
   useEffect(() => {
     const api = window.electronAPI as any;
+    const apiAny = window.electronAPI as any;
+
+    if (apiAny) {
+      apiAny.getAppVersion?.().then((version: string) => {
+        if (version) setAppVersion(version);
+      });
+    }
     
     api?.getDownloadsPath?.().then((defaultDownloadsPath: string) => {
       if (defaultDownloadsPath) {
@@ -248,7 +256,7 @@ export default function App() {
               </h1>
             </div>
             <span className="text-[10px] font-black text-cyan-700 bg-cyan-50 border border-cyan-200 px-2 py-0.5 rounded-full shadow-xs mt-0.5">
-              v1.2.0
+              v{appVersion}
             </span>
          </div>
 
@@ -319,7 +327,7 @@ export default function App() {
                  {licenseStatus === 'FREE' && ` (${quota.remainingDownloads}/10 restants)`}
                </div>
                <div className="text-[10px] text-slate-400 font-bold tracking-tight">
-                 Live & VOD Downloader v1.2.0
+                 Live & VOD Downloader v{appVersion}
                </div>
             </div>
          </div>
@@ -429,7 +437,7 @@ export default function App() {
           <div className={activeTab === 'socialhub' ? '' : 'hidden'}>
             <SocialHub onStartDownload={handleStartDownload} t={t} />
           </div>
-          {activeTab === 'settings' && <Settings language={language} setLanguage={setLanguage} t={t} outputFolder={outputFolder} setOutputFolder={setOutputFolder} defaultFolder={defaultFolder} appUpdate={appUpdate} setAppUpdate={setAppUpdate} updaterLogs={updaterLogs} />}
+          {activeTab === 'settings' && <Settings language={language} setLanguage={setLanguage} t={t} outputFolder={outputFolder} setOutputFolder={setOutputFolder} defaultFolder={defaultFolder} appUpdate={appUpdate} setAppUpdate={setAppUpdate} updaterLogs={updaterLogs} appVersion={appVersion} />}
         </div>
       </main>
 

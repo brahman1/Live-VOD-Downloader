@@ -158,6 +158,8 @@ function createWindow() {
   }
 }
 
+ipcMain.handle('get-app-version', () => app.getVersion());
+
 ipcMain.handle('select-cookie-file', async () => {
   const result = await dialog.showOpenDialog({
     properties: ['openFile'],
