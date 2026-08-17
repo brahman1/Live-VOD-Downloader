@@ -74,6 +74,7 @@ export default function App() {
     percent: 0,
     downloaded: false
   });
+  const [updaterLogs, setUpdaterLogs] = useState<string[]>([]);
 
   const t: Translator = (key) => locales[language][key] || key;
 
