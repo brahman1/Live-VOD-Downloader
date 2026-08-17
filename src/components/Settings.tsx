@@ -172,6 +172,7 @@ export default function Settings({ language, setLanguage, t, outputFolder, setOu
           >
             {appUpdate?.rateLimited ? 'Trop de requêtes ⏱️' : appUpdate?.notAvailable ? 'À jour ✅' : 'Vérifier les mises à jour'}
           </button>
+        </div>
       </div>
 
     </div>
