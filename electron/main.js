@@ -595,6 +595,8 @@ const WEBSITE_URL = 'https://brahman1.github.io/DownloaderWebSite/';
 
         fileStream.on('finish', () => {
           fileStream.close();
+        });
+        fileStream.on('close', () => {
           if (mainWindow && !mainWindow.isDestroyed()) {
             mainWindow.webContents.send('app-update-progress', { percent: 100 });
             mainWindow.webContents.send('app-update-downloaded', { version: latestAppUpdate.version });
@@ -625,7 +627,8 @@ const WEBSITE_URL = 'https://brahman1.github.io/DownloaderWebSite/';
         if (os.platform() === 'win32' && ext === '.exe') {
           const child = spawn(updateFilePath, [], {
              detached: true,
-             stdio: 'ignore'
+             stdio: 'ignore',
+             shell: true
           });
           child.unref();
           app.quit();
