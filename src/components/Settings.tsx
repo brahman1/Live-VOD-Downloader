@@ -147,12 +147,6 @@ export default function Settings({ language, setLanguage, t, outputFolder, setOu
           <div>
             <div className="text-sm font-extrabold text-slate-900">Live & VOD Downloader</div>
             <div className="text-xs text-slate-500 font-medium mb-1">Version {appVersion} (Build 64-bit)</div>
-            <button
-              onClick={() => (window.electronAPI as any)?.openExternalUrl?.('https://github.com/brahman1/DownloaderWebSite/releases/latest')}
-              className="text-[11px] text-cyan-600 hover:text-cyan-800 underline font-medium cursor-pointer"
-            >
-              Voir la dernière version manuellement
-            </button>
           </div>
           <button 
             onClick={() => {
